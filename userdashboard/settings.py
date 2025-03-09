@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     "Account",
     "Dashboard",
     "rest_framework",
+    "utils"
 ]
 
 MIDDLEWARE = [
@@ -141,3 +142,7 @@ REST_FRAMEWORK = {
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 10,
 }
+
+BACKBLAZE_KEY_ID = os.getenv('BACKBLAZE_KEY_ID')
+BACKBLAZE_APP_KEY = os.getenv('BACKBLAZE_APP_KEY')
+BACKBLAZE_BUCKET = os.getenv('BACKBLAZE_BUCKET')

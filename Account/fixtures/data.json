@@ -3,9 +3,11 @@
       {"name": "Entity 1", "description": "Sample description 1","address":"Abu dhabi"},
       {"name": "Entity 2", "description": "Sample description 2","address":"Abu dhabi"}
     ],
-    "model2": [
-      {"title": "Title 1", "status": "active"},
-      {"title": "Title 2", "status": "inactive"}
+    "Role": [
+      {"name": "Admin"},
+      {"name": "Employee"},
+      {"name": "Entity Admin"},
+      {"name": "Approver"}
     ],
     "model3": [
       {"category": "Category A", "value": 100},
