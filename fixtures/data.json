@@ -1,0 +1,19 @@
+{
+    "Entity": [
+      {"name": "Entity 1", "description": "Sample description 1","address":"Abu dhabi"},
+      {"name": "Entity 2", "description": "Sample description 2","address":"Abu dhabi"}
+    ],
+    "model2": [
+      {"title": "Title 1", "status": "active"},
+      {"title": "Title 2", "status": "inactive"}
+    ],
+    "model3": [
+      {"category": "Category A", "value": 100},
+      {"category": "Category B", "value": 200}
+    ],
+    "model4": [
+      {"name": "John Doe", "email": "john@example.com"},
+      {"name": "Jane Doe", "email": "jane@example.com"}
+    ]
+  }
+  

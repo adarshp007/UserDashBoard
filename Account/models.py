@@ -7,6 +7,7 @@ import uuid
 
 from .manager import UserManager
 
+# Create your models here.
 class BaseFields(SafeDeleteModel):
     object_id = models.UUIDField(primary_key=True,default=uuid.uuid4)
     created_by = models.ForeignKey(
@@ -39,7 +40,8 @@ class Entity(BaseFields):
     description = models.TextField(_("entity description"),blank=True,null=True)
     status = models.CharField(_("entity status"), max_length=80,choices=STATUS_CHOICES,default='pending')
 
-# Create your models here.
+class Role(BaseFields):
+    name = models.CharField(_("role name"),max_length=255,blank=True,null=True)
 
 class User(AbstractBaseUser,BaseFields):
     STATUS_CHOICES = (
