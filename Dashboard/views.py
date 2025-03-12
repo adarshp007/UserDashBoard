@@ -2,6 +2,7 @@ from django.shortcuts import render
 from django.http import JsonResponse
 from utils.backblaze import upload_file_to_b2
 from django.views.decorators.csrf import csrf_exempt
+from rest_framework.views import APIView
 # Create your views here.
 @csrf_exempt
 def upload_view(request):
@@ -17,3 +18,21 @@ def upload_view(request):
         file_url = upload_file_to_b2(file_path, clean_filename)
         return JsonResponse({"message": "File uploaded!", "url": file_url})
     return JsonResponse({"error": "Invalid request"}, status=400)
+
+class CreateDashboardView(APIView):
+    def post(self, request):
+        # Get the dashboard data from the request body
+        dashboard_data = request.data
+        return
+class GetDashboardView(APIView):
+    def get(self, request):
+        # Get the dashboard ID from the URL parameters
+        dashboard_id = request.GET.get("id")
+        return
+class CardDetailsView(APIView):
+    def get(self, request):
+        # Get the card ID from the URL parameters
+        card_id = request.GET.get("id")
+        return
+    
+

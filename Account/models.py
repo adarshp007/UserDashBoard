@@ -67,6 +67,18 @@ class User(AbstractBaseUser,BaseFields):
     class Meta:
         verbose_name = _("user")
         verbose_name_plural = _("users")
-    
 
 
+class Dataset(BaseFields):
+    DATASET_STATUS_CHOICES = [
+        ('READ_PENDING','Read Pending'),
+        ('READ_COMMENCE','Read Commence'),
+        ('READ_COMPLETE','Read Complete'),
+        ('WRITE_COMMENCE', 'Write Commence'),
+        ('WRITE_COMPLETE', 'Write Complete')
+    ]
+    name = models.CharField(_("dataset name"),max_length=255)
+    description = models.TextField(_("dataset description"),blank=True)
+    status = models.CharField(_("dataset status"),max_length=255,default='READ_PENDING')
+    owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='datasets')
+    metadata = models.JSONField(default=dict)
