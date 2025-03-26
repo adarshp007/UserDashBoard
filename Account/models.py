@@ -82,3 +82,4 @@ class Dataset(BaseFields):
     status = models.CharField(_("dataset status"),max_length=255,default='READ_PENDING')
     owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='datasets')
     metadata = models.JSONField(default=dict)
+    # file = models.FileField(upload_to='datasets/', blank=True, null=True)  # Add this field for file uploads

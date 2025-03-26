@@ -155,3 +155,25 @@ def upload_file_to_b2(file_path, filename, valid_duration=3600):
         print("Failed to download file:", response.status_code, response.text)
 
     return pre_signed_url
+
+def get_file_from_backblaze(file_name):
+    bucket = b2_api.get_bucket_by_name(BUCKET_NAME)
+    # Define new Parquet filename
+    parquet_filename = file_name.replace(".xlsx", ".parquet")
+    # Generate a pre-signed URL for the file
+    # pre_signed_url = f"https://f005.backblazeb2.com/file/{BUCKET_NAME}/{parquet_filename}?Authorization={auth_token}"
+    # Download the file into memory
+    # file_key=f"file/{BUCKET_NAME}/{parquet_filename}" 
+    downloaded_file = bucket.download_file_by_name(parquet_filename)
+    file_content = BytesIO()
+    downloaded_file.save(file_content)
+    file_content.seek(0)
+    # Read the Parquet file directly into a Polars DataFrame
+    # df = pl.read_parquet(file_content) #dataframe
+    df = pl.scan_parquet(file_content)
+    return df
+
+
+def upload_file_to_s3(file_path,cleaned_name,useremail):
+    
+    return 
