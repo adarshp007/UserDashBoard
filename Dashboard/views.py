@@ -13,6 +13,7 @@ from Account.models import User, Dataset
 import polars as pl
 from utils.aggregate import perform_aggregations, get_available_aggregations, get_dataset_column_aggregations
 from django.shortcuts import get_object_or_404
+from .tasks import process_dataset_file
 
 # Create your views here.
 @csrf_exempt
@@ -55,28 +56,27 @@ class CraeteDatsetView(APIView):
                     for chunk in file.chunks():
                         f.write(chunk)
 
-                # Upload file to Backblaze and extract metadata
-                result = upload_file_to_b2(file_path, clean_filename, extract_metadata=True)
-
-                # Create dataset with metadata
+                # Create dataset with initial status
                 dataset = serializer.save(
                     owner=User.objects.first(),
-                    status="READ_COMPLETE",
-                    metadata=result["metadata"]
+                    status="READ_PENDING"
                 )
 
-                # Return response with dataset info and aggregation possibilities
+                # Launch Celery task to process the file in the background
+                process_dataset_file.delay(file_path, clean_filename, str(dataset.object_id))
+
+                # Return immediate response
                 return Response({
-                    "message": "Dataset created successfully",
+                    "message": "Dataset creation initiated. Processing in background.",
                     "dataset": serializer.data,
-                    "file_url": result["url"],
-                    "dataset_info": result["metadata"]["dataset_info"],
-                    "columns": result["metadata"]["columns"]
-                }, status=status.HTTP_201_CREATED)
+                    "dataset_id": str(dataset.object_id),
+                    "status": "READ_PENDING",
+                    "note": "Metadata and aggregation possibilities will be available once processing is complete."
+                }, status=status.HTTP_202_ACCEPTED)
 
             except Exception as e:
                 return Response(
-                    {"error": f"Failed to process dataset: {str(e)}"},
+                    {"error": f"Failed to initiate dataset processing: {str(e)}"},
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR
                 )
 
@@ -302,5 +302,45 @@ class DatasetColumnAggregationsView(APIView):
         except Exception as e:
             return Response(
                 {"error": f"Failed to get dataset column aggregations: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class DatasetStatusView(APIView):
+    """
+    API view for checking the status of a dataset.
+
+    GET: Get the current status and metadata of a dataset.
+    """
+    permission_classes = [AllowAny]
+
+    def get(self, request, dataset_id=None):
+        """
+        Get the current status and metadata of a dataset.
+        """
+        try:
+            # Get the dataset by ID
+            dataset = get_object_or_404(Dataset, object_id=dataset_id)
+
+            # Prepare the response based on the dataset status
+            response_data = {
+                "dataset_id": str(dataset.object_id),
+                "name": dataset.name,
+                "description": dataset.description,
+                "status": dataset.status,
+                "created_date": dataset.created_date,
+                "modified_date": dataset.modified_date
+            }
+
+            # If the dataset has been processed successfully, include metadata
+            if dataset.status == "READ_COMPLETE" and dataset.metadata:
+                response_data["dataset_info"] = dataset.metadata.get("dataset_info", {})
+                response_data["columns"] = dataset.metadata.get("columns", {})
+
+            return Response(response_data, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response(
+                {"error": f"Failed to get dataset status: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )

@@ -8,4 +8,5 @@ urlpatterns=[
     path('getData/',TestDashboardFuctions.as_view(),name='get-dataset'),
     path('aggregations/',DataAggregationView.as_view(),name='data-aggregations'),
     path('dataset-columns/',DatasetColumnAggregationsView.as_view(),name='dataset-column-aggregations'),
+    path('dataset-status/<uuid:dataset_id>/',DatasetStatusView.as_view(),name='dataset-status'),
 ]

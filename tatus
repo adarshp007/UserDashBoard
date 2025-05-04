@@ -1,0 +1,47 @@
+[33mcommit 6ba0d75dc82dd7e19a02a6cc60a61a73545a5705[m[33m ([m[1;36mHEAD -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m
+Author: adarshp007 <adarshmp123@gmail.com>
+Date:   Sun May 4 23:07:44 2025 +0530
+
+    Add API for dataset aggregations and metadata extraction. This includes: 1) API to perform selected aggregations on datasets with multiple aggregations on same fields 2) API to list possible aggregations based on column types 3) Enhanced file upload to save metadata and return aggregation possibilities 4) Added test scripts for all new functionality
+
+[33mcommit 3b9971aa9b00c42601a977ca7516fb01517f11ce[m
+Author: adarshp007 <adarshmp123@gmail.com>
+Date:   Thu Mar 27 01:27:07 2025 +0530
+
+    Feat: Adds polars and supoted functions
+
+[33mcommit 9388ef241b67b880a664723abdafc090755ea566[m
+Author: adarshp007 <adarshmp123@gmail.com>
+Date:   Wed Mar 12 16:39:54 2025 +0530
+
+    Feat:adds dataset models
+
+[33mcommit 2d01a6e53cfec9fd71fed2e3b42374d038b1a55a[m
+Author: adarshp007 <adarshmp123@gmail.com>
+Date:   Mon Mar 10 14:55:14 2025 +0530
+
+    Feat: Adds parquet conversion
+
+[33mcommit c2f4963fdd5172be8643edb3147042748843fee2[m
+Author: adarshp007 <adarshmp123@gmail.com>
+Date:   Mon Mar 10 03:36:01 2025 +0530
+
+    Adds blackblaze servise for file upload
+
+[33mcommit 4845e9d67c2045d9374498713b5c6d62b04cd145[m
+Author: adarshp007 <adarshmp123@gmail.com>
+Date:   Sun Mar 9 14:33:10 2025 +0530
+
+    Feat:adds migrations change
+
+[33mcommit d06f5accbea708ad3609e811deb8cd118a4ef912[m
+Author: adarsh.p <adarsh.p@beinex.com>
+Date:   Sun Mar 9 00:26:39 2025 +0530
+
+    initial commit
+
+[33mcommit ab1f8908037164b8baf6263db0b74aceb25d5cf8[m
+Author: adarshp007 <68066867+adarshp007@users.noreply.github.com>
+Date:   Sat Mar 8 19:48:28 2025 +0530
+
+    Initial commit
