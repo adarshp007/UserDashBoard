@@ -20,7 +20,7 @@ b2_api.authorize_account('production', KEY_ID, KEY_APPLICATION_KEY)
 # def upload_file_to_b2(file_path, filename, valid_duration=3600):
 #     """
 #     Uploads a file to Backblaze B2 and generates a pre-signed URL for access.
-    
+
 #     Args:
 #         file_path (str): The local path to the file.
 #         filename (str): The name to store the file as in B2.
@@ -39,8 +39,8 @@ b2_api.authorize_account('production', KEY_ID, KEY_APPLICATION_KEY)
 #     auth_token = bucket.get_download_authorization(filename, valid_duration)
 
 #     pre_signed_url =f"https://f005.backblazeb2.com/file/{BUCKET_NAME}/{filename}?Authorization={auth_token}"
-   
-    
+
+
 #     # # response = requests.head(pre_signed_url)
 #     # response = requests.get(pre_signed_url, stream=True)
 #     # if response.status_code == 200:
@@ -55,7 +55,7 @@ b2_api.authorize_account('production', KEY_ID, KEY_APPLICATION_KEY)
 # def upload_file_to_b2(file_path, filename, valid_duration=3600):
 #     """
 #     Reads an Excel file, converts it to Parquet, and uploads it to Backblaze B2.
-    
+
 #     Args:
 #         file_path (str): The local path to the Excel file.
 #         filename (str): The name to store the file as in B2 (without extension).
@@ -71,7 +71,7 @@ b2_api.authorize_account('production', KEY_ID, KEY_APPLICATION_KEY)
 #     # Convert DataFrame to Parquet and store in memory
 #     parquet_buffer = BytesIO()
 #     df.to_parquet(parquet_buffer, engine="pyarrow", index=False)
-    
+
 #     # Reset buffer position to the beginning
 #     parquet_buffer.seek(0)
 
@@ -102,21 +102,29 @@ b2_api.authorize_account('production', KEY_ID, KEY_APPLICATION_KEY)
 #     return pre_signed_url
 
 
-def upload_file_to_b2(file_path, filename, valid_duration=3600):
+def upload_file_to_b2(file_path, filename, valid_duration=3600, extract_metadata=False):
     """
     Reads an Excel file, converts it to Parquet, and uploads it to Backblaze B2.
-    
+
     Args:
         file_path (str): The local path to the Excel file.
         filename (str): The name to store the file as in B2 (without extension).
         valid_duration (int): Time in seconds for which the pre-signed URL is valid.
+        extract_metadata (bool): Whether to extract and return metadata about the file.
 
     Returns:
-        str: Pre-signed URL for the uploaded Parquet file.
+        dict: Dictionary containing the pre-signed URL and metadata if extract_metadata is True,
+              otherwise just the pre-signed URL as a string.
     """
+    from utils.aggregate import extract_dataset_metadata
 
     # Read Excel file using Polars (faster than Pandas)
     df = pl.read_excel(file_path, engine="openpyxl")
+
+    # Extract metadata if requested
+    metadata = None
+    if extract_metadata:
+        metadata = extract_dataset_metadata(df)
 
     # Convert to Parquet with Snappy compression (optimized for speed & size)
     parquet_buffer = BytesIO()
@@ -154,7 +162,14 @@ def upload_file_to_b2(file_path, filename, valid_duration=3600):
     else:
         print("Failed to download file:", response.status_code, response.text)
 
-    return pre_signed_url
+    if extract_metadata:
+        return {
+            "url": pre_signed_url,
+            "filename": parquet_filename,
+            "metadata": metadata
+        }
+    else:
+        return pre_signed_url
 
 def get_file_from_backblaze(file_name):
     bucket = b2_api.get_bucket_by_name(BUCKET_NAME)
@@ -163,7 +178,7 @@ def get_file_from_backblaze(file_name):
     # Generate a pre-signed URL for the file
     # pre_signed_url = f"https://f005.backblazeb2.com/file/{BUCKET_NAME}/{parquet_filename}?Authorization={auth_token}"
     # Download the file into memory
-    # file_key=f"file/{BUCKET_NAME}/{parquet_filename}" 
+    # file_key=f"file/{BUCKET_NAME}/{parquet_filename}"
     downloaded_file = bucket.download_file_by_name(parquet_filename)
     file_content = BytesIO()
     downloaded_file.save(file_content)
@@ -175,5 +190,5 @@ def get_file_from_backblaze(file_name):
 
 
 def upload_file_to_s3(file_path,cleaned_name,useremail):
-    
-    return 
+
+    return

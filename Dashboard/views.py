@@ -2,14 +2,17 @@ from django.shortcuts import render
 from django.http import JsonResponse
 # from requests import Response
 from rest_framework.response import Response
+from rest_framework import status
 from utils.backblaze import upload_file_to_b2, get_file_from_backblaze
 from utils.aws_config import upload_file_to_s3
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny
-from .serializer import DatasetCreateSerializer
-from Account.models import User
+from .serializers import DatasetCreateSerializer, AggregationRequestSerializer, DatasetSourceSerializer
+from Account.models import User, Dataset
 import polars as pl
+from utils.aggregate import perform_aggregations, get_available_aggregations, get_dataset_column_aggregations
+from django.shortcuts import get_object_or_404
 
 # Create your views here.
 @csrf_exempt
@@ -29,15 +32,56 @@ def upload_view(request):
 class CraeteDatsetView(APIView):
     permission_classes=[AllowAny]
     serializer_class = DatasetCreateSerializer
-    def post(self,request):
-        # breakpoint()
+
+    def post(self, request):
         serializer = self.serializer_class(data=request.data)
+
         if serializer.is_valid():
-            
-            serializer.save(owner=User.objects.first(),status="READ_PENDING")
-            return Response(serializer.data,status=201)
-        return Response(data={"error":serializer.errors},status=400)
-        
+            try:
+                # Get the uploaded file
+                file = request.FILES.get("file")
+                if not file:
+                    return Response(
+                        {"error": "No file was uploaded"},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+
+                # Trim whitespace and replace spaces with underscores
+                clean_filename = "_".join(file.name.strip().split())
+                file_path = f"/tmp/{clean_filename}"
+
+                # Save file temporarily
+                with open(file_path, "wb") as f:
+                    for chunk in file.chunks():
+                        f.write(chunk)
+
+                # Upload file to Backblaze and extract metadata
+                result = upload_file_to_b2(file_path, clean_filename, extract_metadata=True)
+
+                # Create dataset with metadata
+                dataset = serializer.save(
+                    owner=User.objects.first(),
+                    status="READ_COMPLETE",
+                    metadata=result["metadata"]
+                )
+
+                # Return response with dataset info and aggregation possibilities
+                return Response({
+                    "message": "Dataset created successfully",
+                    "dataset": serializer.data,
+                    "file_url": result["url"],
+                    "dataset_info": result["metadata"]["dataset_info"],
+                    "columns": result["metadata"]["columns"]
+                }, status=status.HTTP_201_CREATED)
+
+            except Exception as e:
+                return Response(
+                    {"error": f"Failed to process dataset: {str(e)}"},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+
+        return Response({"error": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+
     # def post(self, request):
     #     # Get the uploaded file from the request
     #     file = request.FILES.get("file")
@@ -84,13 +128,13 @@ class GetDashboardView(APIView):
                     elif agg == "max":
                         data[column]["max"] = df[column].max()
         return Response(data,status=200)
-        
+
 class CardDetailsView(APIView):
     def get(self, request):
         # Get the card ID from the URL parameters
         card_id = request.GET.get("id")
         return
-    
+
 class TestDashboardFuctions(APIView):
     permission_classes=[AllowAny]
     def get(self, request):
@@ -130,7 +174,7 @@ class TestDashboardFuctions(APIView):
                 stats_exprs.append(
                     pl.col(name).is_null().sum().alias(f"{name}_null_count")
                 )
-        
+
         # Execute the query and collect results
         stats_df = lf.select(stats_exprs).collect()
         # Convert to nested JSON structure
@@ -145,6 +189,118 @@ class TestDashboardFuctions(APIView):
 
         return Response(data=data,status=200)
 
-        
+
+class DataAggregationView(APIView):
+    """
+    API view for performing aggregations on datasets.
+
+    POST: Perform aggregations on a dataset based on the provided configuration.
+    GET: Get information about available aggregation functions.
+    """
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        """
+        Get information about available aggregation functions.
+        """
+        return Response({
+            "available_aggregations": get_available_aggregations(),
+            "usage_example": {
+                "dataset_id": "uuid-of-dataset",  # or "file_name": "filename.xlsx"
+                "aggregations": {
+                    "column1": ["mean", "sum", "min", "max"],
+                    "column2": ["unique_count", "most_frequent"]
+                }
+            }
+        }, status=status.HTTP_200_OK)
+
+    def post(self, request):
+        """
+        Perform aggregations on a dataset based on the provided configuration.
+        """
+        serializer = AggregationRequestSerializer(data=request.data)
+
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        validated_data = serializer.validated_data
+
+        try:
+            # Get the dataset based on the provided identifier
+            if 'dataset_id' in validated_data:
+                # Get dataset by ID
+                dataset = get_object_or_404(Dataset, object_id=validated_data['dataset_id'])
+                # TODO: Implement logic to get the file from the dataset
+                # For now, we'll use a placeholder
+                file_name = "Employment_to_population_ratio_for_residents_in_the_Emirate_of_Abu_Dhabi_by_region_and_gender_-_quarterly.csv_(2).xlsx"
+            else:
+                # Get dataset by file name
+                file_name = validated_data['file_name']
+
+            # Get the dataframe
+            df = get_file_from_backblaze(file_name)
+
+            # Perform the aggregations
+            aggregation_config = validated_data['aggregations']
+            result = perform_aggregations(df, aggregation_config)
+
+            return Response(result, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response(
+                {"error": f"Failed to perform aggregations: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 
+class DatasetColumnAggregationsView(APIView):
+    """
+    API view for getting available aggregations for each column in a dataset.
+
+    POST: Get available aggregations for each column in a dataset based on its data type.
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        """
+        Get available aggregations for each column in a dataset based on its data type.
+        """
+        serializer = DatasetSourceSerializer(data=request.data)
+
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        validated_data = serializer.validated_data
+
+        try:
+            # Get the dataset based on the provided identifier
+            if 'dataset_id' in validated_data:
+                # Get dataset by ID
+                dataset = get_object_or_404(Dataset, object_id=validated_data['dataset_id'])
+                # TODO: Implement logic to get the file from the dataset
+                # For now, we'll use a placeholder
+                file_name = "Employment_to_population_ratio_for_residents_in_the_Emirate_of_Abu_Dhabi_by_region_and_gender_-_quarterly.csv_(2).xlsx"
+            else:
+                # Get dataset by file name
+                file_name = validated_data['file_name']
+
+            # Get the dataframe
+            df = get_file_from_backblaze(file_name)
+
+            # Get column aggregations
+            result = get_dataset_column_aggregations(df)
+
+            return Response({
+                "dataset_info": {
+                    "file_name": file_name,
+                    "num_columns": len(df.columns),
+                    "num_rows": df.height
+                },
+                "columns": result
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response(
+                {"error": f"Failed to get dataset column aggregations: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
