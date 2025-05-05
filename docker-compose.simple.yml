@@ -1,0 +1,17 @@
+services:
+  # Django Web Application
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: >
+      sh -c "python manage.py runserver 0.0.0.0:8000"
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    environment:
+      - DEBUG=True
+      - SECRET_KEY=django-insecure-key-for-development
+      - ALLOWED_HOSTS=localhost,127.0.0.1
+      - DATABASE_URL=sqlite:///db.sqlite3

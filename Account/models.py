@@ -43,7 +43,7 @@ class Entity(BaseFields):
 class Role(BaseFields):
     name = models.CharField(_("role name"),max_length=255,blank=True,null=True)
 
-class User(AbstractBaseUser,BaseFields):
+class User(AbstractBaseUser, BaseFields):
     STATUS_CHOICES = (
         ('pending', 'Pending'),
         ('approved', 'Approved'),
@@ -51,22 +51,32 @@ class User(AbstractBaseUser,BaseFields):
         ('active', 'Active'),
         ('in_active', 'In Active'),
     )
-    first_name = models.CharField(_("first name"),max_length=255)
-    last_name = models.CharField(_("last name"),max_length=255,blank=True,null=True)
-    email = models.EmailField(_("email address"), unique=True,)
-    phone_number = models.CharField(_("phone number"),max_length=15, blank=True, null=True)
-    address = models.TextField(_("address"),blank=True,null=True)
+    first_name = models.CharField(_("first name"), max_length=255)
+    last_name = models.CharField(_("last name"), max_length=255, blank=True, null=True)
+    email = models.EmailField(_("email address"), unique=True)
+    phone_number = models.CharField(_("phone number"), max_length=15, blank=True, null=True)
+    address = models.TextField(_("address"), blank=True, null=True)
     is_superuser = models.BooleanField(default=False)
-    entity = models.ForeignKey(Entity,on_delete=models.CASCADE,blank=True,null=True,related_name="%(app_label)s_%(class)s_entity",)
-    status = models.CharField(_("user status"), max_length=80,choices=STATUS_CHOICES,default='pending')
-    
+    is_staff = models.BooleanField(default=False)
+    is_active = models.BooleanField(default=True)
+    entity = models.ForeignKey(Entity, on_delete=models.CASCADE, blank=True, null=True, related_name="%(app_label)s_%(class)s_entity")
+    status = models.CharField(_("user status"), max_length=80, choices=STATUS_CHOICES, default='pending')
+
     objects = UserManager()
 
     EMAIL_FIELD = "email"
     USERNAME_FIELD = "email"
+    REQUIRED_FIELDS = ['first_name']
+
     class Meta:
         verbose_name = _("user")
         verbose_name_plural = _("users")
+
+    def has_perm(self, perm, obj=None):
+        return self.is_superuser
+
+    def has_module_perms(self, app_label):
+        return self.is_superuser
 
 
 class Dataset(BaseFields):

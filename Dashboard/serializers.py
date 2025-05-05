@@ -2,9 +2,19 @@ from rest_framework import serializers
 from Account.models import Dataset
 
 class DatasetCreateSerializer(serializers.ModelSerializer):
+    # Add a file field that's not part of the model
+    file = serializers.FileField(write_only=True, required=False)
+
     class Meta:
         model = Dataset
         fields = ['name', 'description', 'file']
+
+    def create(self, validated_data):
+        # Remove the file from validated_data as it's not a model field
+        file = validated_data.pop('file', None)
+        # Create the dataset instance
+        dataset = Dataset.objects.create(**validated_data)
+        return dataset
 
 class AggregationRequestSerializer(serializers.Serializer):
     """

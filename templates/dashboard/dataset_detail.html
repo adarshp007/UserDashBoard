@@ -1,0 +1,1665 @@
+{% extends 'base.html' %}
+
+{% block title %}Dataset Details{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-3">
+        <div class="col-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{% url 'index' %}">Dashboard</a></li>
+                    <li class="breadcrumb-item"><a href="{% url 'dataset-list-page' %}">Datasets</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Dataset Details</li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h4 class="mb-0" id="dataset-name">Dataset Details</h4>
+                        <div>
+                            <button class="btn btn-danger" id="delete-dataset">
+                                <i class="fas fa-trash"></i> Delete
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div id="loading-indicator" class="text-center py-5">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-2">Loading dataset information...</p>
+                    </div>
+
+                    <div id="dataset-info" style="display: none;">
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <h5>Basic Information</h5>
+                                <table class="table table-bordered">
+                                    <tbody>
+                                        <tr>
+                                            <th style="width: 30%">Name</th>
+                                            <td id="info-name"></td>
+                                        </tr>
+                                        <tr>
+                                            <th>Description</th>
+                                            <td id="info-description"></td>
+                                        </tr>
+                                        <tr>
+                                            <th>Status</th>
+                                            <td id="info-status"></td>
+                                        </tr>
+                                        <tr>
+                                            <th>Created</th>
+                                            <td id="info-created"></td>
+                                        </tr>
+                                        <tr>
+                                            <th>Last Modified</th>
+                                            <td id="info-modified"></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="col-md-6">
+                                <h5>Dataset Statistics</h5>
+                                <table class="table table-bordered">
+                                    <tbody>
+                                        <tr>
+                                            <th style="width: 30%">Rows</th>
+                                            <td id="stats-rows"></td>
+                                        </tr>
+                                        <tr>
+                                            <th>Columns</th>
+                                            <td id="stats-columns"></td>
+                                        </tr>
+                                        <tr>
+                                            <th>Memory Usage</th>
+                                            <td id="stats-memory"></td>
+                                        </tr>
+                                        <tr>
+                                            <th>Null Values</th>
+                                            <td id="stats-nulls"></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <div class="card">
+                                    <div class="card-header bg-info text-white">
+                                        <h5 class="mb-0">Create Visualization</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <!-- Available Columns Information -->
+                                        <div class="alert alert-info mb-3">
+                                            <h6><i class="fas fa-info-circle"></i> Available Columns</h6>
+                                            <p class="mb-2">The following columns are available in this dataset:</p>
+                                            <div id="available-columns-list" class="row">
+                                                <!-- Will be populated dynamically -->
+                                            </div>
+                                        </div>
+
+                                        <form id="visualization-form">
+                                            <div class="row">
+                                                <div class="col-md-5">
+                                                    <div class="mb-3">
+                                                        <label for="x-axis" class="form-label">X-Axis Variable</label>
+                                                        <select class="form-select" id="x-axis" required>
+                                                            <option value="">Select X-Axis Variable</option>
+                                                            <!-- Options will be populated dynamically -->
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-5">
+                                                    <div class="mb-3">
+                                                        <label for="y-axis" class="form-label">Y-Axis Variable(s)</label>
+                                                        <select class="form-select" id="y-axis" multiple required>
+                                                            <!-- Options will be populated dynamically -->
+                                                        </select>
+                                                        <small class="form-text text-muted">Hold Ctrl/Cmd to select multiple items</small>
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-2">
+                                                    <div class="mb-3">
+                                                        <label for="chart-type" class="form-label">Chart Type</label>
+                                                        <select class="form-select" id="chart-type" required>
+                                                            <option value="bar">Bar Chart</option>
+                                                            <option value="line">Line Chart</option>
+                                                            <option value="scatter">Scatter Plot</option>
+                                                            <option value="pie">Pie Chart</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="row mb-3">
+                                                <div class="col-12">
+                                                    <div class="card">
+                                                        <div class="card-header bg-primary text-white">
+                                                            <h6 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Aggregation Settings</h6>
+                                                        </div>
+                                                        <div class="card-body">
+                                                            <div class="row">
+                                                                <div class="col-md-6">
+                                                                    <div class="mb-3">
+                                                                        <h5 class="mb-2 text-primary fw-bold">X-Axis Aggregation</h5>
+                                                                        <div id="x-axis-aggregation-container" class="border border-primary rounded p-3 bg-light" style="min-height: 100px;">
+                                                                            <p class="text-muted">Select X-Axis variable(s) first</p>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                                <div class="col-md-6">
+                                                                    <div class="mb-3">
+                                                                        <h5 class="mb-2 text-primary fw-bold">Y-Axis Aggregation</h5>
+                                                                        <div id="y-axis-aggregation-container" class="border border-primary rounded p-3 bg-light" style="min-height: 100px;">
+                                                                            <p class="text-muted">Select Y-Axis variable first</p>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="row">
+                                                <div class="col-md-4">
+                                                    <div class="mb-3">
+                                                        <label for="filter-column" class="form-label">Filter Column (Optional)</label>
+                                                        <select class="form-select" id="filter-column">
+                                                            <option value="">No Filter</option>
+                                                            <!-- Options will be populated dynamically -->
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <div class="mb-3">
+                                                        <label for="filter-value" class="form-label">Filter Value</label>
+                                                        <input type="text" class="form-control" id="filter-value" placeholder="Enter filter value">
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="row mb-3">
+                                                <div class="col-12">
+                                                    <div id="aggregation-summary" class="alert alert-success d-none">
+                                                        <h5 class="mb-3"><i class="fas fa-check-circle me-2"></i> Selected Aggregations</h5>
+                                                        <div class="card mb-2">
+                                                            <div class="card-body bg-light">
+                                                                <div id="x-axis-summary" class="mb-3"></div>
+                                                                <div id="y-axis-summary"></div>
+                                                                <div class="mt-3 text-info">
+                                                                    <i class="fas fa-info-circle"></i> These aggregations will be applied when you generate the visualization.
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <button type="submit" class="btn btn-primary btn-lg w-100 py-3 mt-3">
+                                                <i class="fas fa-chart-bar me-2"></i> Generate Visualization
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <div class="card">
+                                    <div class="card-header bg-primary text-white">
+                                        <h5 class="mb-0">Visualization</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <div id="visualization-container" style="height: 400px;">
+                                            <div class="text-center py-5 text-muted">
+                                                <i class="fas fa-chart-bar fa-3x mb-3"></i>
+                                                <p>Select variables and click "Generate Visualization" to create a chart</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-12">
+                                <h5>Columns and Possible Aggregations</h5>
+                                <div class="table-responsive">
+                                    <table class="table table-striped table-hover" id="columns-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Column Name</th>
+                                                <th>Data Type</th>
+                                                <th>Sample Data</th>
+                                                <th>Available Aggregations</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="columns-list">
+                                            <!-- Columns will be loaded here dynamically -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="error-message" class="alert alert-danger" style="display: none;">
+                        An error occurred while loading the dataset information.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="deleteModalLabel">Confirm Delete</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                Are you sure you want to delete this dataset? This action cannot be undone.
+                <p class="mt-2 fw-bold" id="delete-dataset-name"></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirm-delete">Delete</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Include Chart.js for visualizations -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+    // Global variables
+    let currentDataset = null;
+    let currentChart = null;
+
+    $(document).ready(function() {
+        // Get dataset ID from URL
+        const pathParts = window.location.pathname.split('/');
+        const datasetId = pathParts[pathParts.length - 2]; // Get the ID from the URL
+
+        // Load dataset details
+        loadDatasetDetails(datasetId);
+
+        // Set up delete confirmation
+        $('#delete-dataset').on('click', function() {
+            $('#delete-dataset-name').text($('#info-name').text());
+            $('#deleteModal').modal('show');
+        });
+
+        // Handle delete confirmation
+        $('#confirm-delete').on('click', function() {
+            deleteDataset(datasetId);
+            $('#deleteModal').modal('hide');
+        });
+
+        // Handle visualization form submission
+        $('#visualization-form').on('submit', function(e) {
+            e.preventDefault();
+            generateVisualization(datasetId);
+        });
+    });
+
+    // Function to load dataset details
+    function loadDatasetDetails(datasetId) {
+        $.ajax({
+            url: `/dashboard/api/datasets/${datasetId}/`,
+            type: 'GET',
+            success: function(response) {
+                displayDatasetDetails(response);
+            },
+            error: function(xhr, status, error) {
+                console.error('Error loading dataset details:', error);
+                $('#loading-indicator').hide();
+                $('#error-message').show();
+            }
+        });
+    }
+
+    // Function to display dataset details
+    function displayDatasetDetails(dataset) {
+        // Store the dataset for later use
+        currentDataset = dataset;
+
+        // Update page title and dataset name
+        document.title = `${dataset.name} - Dataset Details`;
+        $('#dataset-name').text(dataset.name);
+
+        // Basic information
+        $('#info-name').text(dataset.name);
+        $('#info-description').text(dataset.description || '-');
+
+        // Format status
+        let statusClass = 'bg-secondary';
+        if (dataset.status === 'READ_COMPLETE') {
+            statusClass = 'bg-success';
+        } else if (dataset.status === 'READ_PENDING' || dataset.status === 'READ_COMMENCE') {
+            statusClass = 'bg-warning';
+        } else if (dataset.status === 'READ_FAILED') {
+            statusClass = 'bg-danger';
+        }
+        const statusText = dataset.status.replace('_', ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
+        $('#info-status').html(`<span class="badge ${statusClass}">${statusText}</span>`);
+
+        // Dates
+        $('#info-created').text(new Date(dataset.created_date).toLocaleString());
+        $('#info-modified').text(new Date(dataset.modified_date).toLocaleString());
+
+        // Dataset statistics
+        if (dataset.dataset_info) {
+            $('#stats-rows').text(dataset.dataset_info.num_rows || '-');
+            $('#stats-columns').text(dataset.dataset_info.num_columns || '-');
+
+            // Format memory usage
+            const memoryBytes = dataset.dataset_info.memory_usage || 0;
+            let memoryText = '-';
+            if (memoryBytes > 0) {
+                if (memoryBytes < 1024) {
+                    memoryText = `${memoryBytes} bytes`;
+                } else if (memoryBytes < 1024 * 1024) {
+                    memoryText = `${(memoryBytes / 1024).toFixed(2)} KB`;
+                } else if (memoryBytes < 1024 * 1024 * 1024) {
+                    memoryText = `${(memoryBytes / (1024 * 1024)).toFixed(2)} MB`;
+                } else {
+                    memoryText = `${(memoryBytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+                }
+            }
+            $('#stats-memory').text(memoryText);
+
+            // Null values
+            const nullCount = dataset.dataset_info.total_null_count || 0;
+            $('#stats-nulls').text(nullCount);
+        } else {
+            $('#stats-rows').text('-');
+            $('#stats-columns').text('-');
+            $('#stats-memory').text('-');
+            $('#stats-nulls').text('-');
+        }
+
+        // Columns and aggregations
+        if (dataset.columns) {
+            let columnsHtml = '';
+
+            // Sort columns alphabetically
+            const columnNames = Object.keys(dataset.columns).sort();
+
+            // Populate the available columns list
+            let availableColumnsHtml = '';
+            columnNames.forEach(function(columnName) {
+                const column = dataset.columns[columnName];
+                const dataType = column.data_type || column.polars_type || 'unknown';
+                availableColumnsHtml += `
+                    <div class="col-md-4 mb-2">
+                        <div class="card border-primary">
+                            <div class="card-body p-2">
+                                <span class="badge bg-primary">${columnName}</span>
+                                <small class="text-muted d-block">(${dataType})</small>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            $('#available-columns-list').html(availableColumnsHtml);
+
+            // Populate the visualization form dropdowns
+            populateVisualizationForm(dataset.columns, columnNames);
+
+            columnNames.forEach(function(columnName) {
+                const column = dataset.columns[columnName];
+
+                // Format sample data
+                let sampleData = '-';
+                if (column.sample_data && column.sample_data.length > 0) {
+                    sampleData = column.sample_data.slice(0, 3).join(', ');
+                    if (column.sample_data.length > 3) {
+                        sampleData += '...';
+                    }
+                }
+
+                // Format aggregations
+                let aggregations = '-';
+                if (column.available_aggregations && column.available_aggregations.length > 0) {
+                    aggregations = column.available_aggregations.join(', ');
+                }
+
+                columnsHtml += `
+                    <tr>
+                        <td>${columnName}</td>
+                        <td>${column.data_type || column.polars_type || '-'}</td>
+                        <td>${sampleData}</td>
+                        <td>${aggregations}</td>
+                    </tr>
+                `;
+            });
+
+            $('#columns-list').html(columnsHtml);
+        } else {
+            $('#columns-list').html('<tr><td colspan="4" class="text-center">No column information available</td></tr>');
+        }
+
+        // Show the dataset info section
+        $('#loading-indicator').hide();
+        $('#dataset-info').show();
+    }
+
+    // Function to populate the visualization form
+    function populateVisualizationForm(columns, columnNames) {
+        // Clear existing options
+        $('#x-axis').empty();
+        $('#y-axis').html('<option value="">Select Y-Axis Variable</option>');
+        $('#filter-column').html('<option value="">No Filter</option>');
+
+        // Add options for each column
+        columnNames.forEach(function(columnName) {
+            const column = columns[columnName];
+            const dataType = column.data_type || column.polars_type || 'unknown';
+
+            // Add to x-axis dropdown (all columns)
+            $('#x-axis').append(`<option value="${columnName}" data-type="${dataType}">${columnName}</option>`);
+
+            // Add to y-axis dropdown (all columns)
+            $('#y-axis').append(`<option value="${columnName}" data-type="${dataType}">${columnName}</option>`);
+
+            // Add to filter column dropdown (all columns)
+            $('#filter-column').append(`<option value="${columnName}" data-type="${dataType}">${columnName}</option>`);
+        });
+
+        // Add event listeners for dropdown changes
+        $('#x-axis').on('change', function() {
+            updateFormBasedOnSelections();
+            updateAggregationOptions();
+        });
+
+        $('#y-axis').on('change', function() {
+            updateFormBasedOnSelections();
+            updateAggregationOptions();
+        });
+
+        $('#chart-type').on('change', function() {
+            updateFormBasedOnSelections();
+        });
+
+        $('#filter-column').on('change', function() {
+            const columnName = $(this).val();
+            if (columnName && currentDataset && currentDataset.columns[columnName]) {
+                const column = currentDataset.columns[columnName];
+
+                // If it's a categorical column with sample data, show a datalist with options
+                if (column.sample_data && column.sample_data.length > 0 && !isNumericColumn(column)) {
+                    let datalistId = 'filter-values-list';
+                    let datalistHtml = `<datalist id="${datalistId}">`;
+
+                    // Add unique values to the datalist
+                    const uniqueValues = [...new Set(column.sample_data)];
+                    uniqueValues.forEach(value => {
+                        datalistHtml += `<option value="${value}">`;
+                    });
+
+                    datalistHtml += '</datalist>';
+
+                    // Add the datalist to the page if it doesn't exist
+                    if ($(`#${datalistId}`).length === 0) {
+                        $('body').append(datalistHtml);
+                    }
+
+                    // Set the input to use the datalist
+                    $('#filter-value').attr('list', datalistId);
+                } else {
+                    // Remove the datalist attribute
+                    $('#filter-value').removeAttr('list');
+                }
+            }
+        });
+    }
+
+    // Function to update aggregation options for both x and y axes
+    function updateAggregationOptions() {
+        const xAxisValues = $('#x-axis').val() || [];
+        const yAxis = $('#y-axis').val();
+
+        // Update X-Axis aggregation options
+        updateXAxisAggregations(xAxisValues);
+
+        // Update Y-Axis aggregation options
+        updateYAxisAggregations(yAxis);
+    }
+
+    // Function to update X-Axis aggregation options
+    function updateXAxisAggregations(xAxisValues) {
+        console.log("Updating X-Axis aggregations with:", xAxisValues);
+
+        // Clear existing content
+        $('#x-axis-aggregation-container').empty();
+
+        // Ensure xAxisValues is an array
+        if (!xAxisValues) {
+            $('#x-axis-aggregation-container').html('<p class="text-muted">Select X-Axis variable(s) first</p>');
+            return;
+        }
+
+        // Convert to array if it's a single value
+        const xAxisArray = Array.isArray(xAxisValues) ? xAxisValues : [xAxisValues];
+
+        if (xAxisArray.length === 0) {
+            $('#x-axis-aggregation-container').html('<p class="text-muted">Select X-Axis variable(s) first</p>');
+            return;
+        }
+
+        // Clear any existing X-axis aggregations that are not in the current selection
+        $('.x-axis-aggregation').each(function() {
+            const column = $(this).data('column');
+            if (!xAxisArray.includes(column)) {
+                // Remove aggregation for columns that are no longer selected
+                $(this).val('');
+                $(this).removeClass('border-primary');
+                $(this).next('.aggregation-feedback').remove();
+            }
+        });
+
+        // Create aggregation options for each selected x-axis variable
+        let html = '';
+
+        // Add a header
+        if (xAxisArray.length > 1) {
+            html += '<div class="alert alert-info mb-3">Select aggregation for each X-axis variable:</div>';
+        }
+
+        xAxisArray.forEach(function(columnName) {
+            console.log("Processing X-axis column:", columnName);
+
+            if (currentDataset && currentDataset.columns[columnName]) {
+                const column = currentDataset.columns[columnName];
+
+                // Get available aggregations for this column as X-axis
+                let availableAggregations = getAvailableAggregations(column, 'x');
+                console.log(`Available X-axis aggregations for ${columnName}:`, availableAggregations);
+
+                // Create a select dropdown for this column
+                html += `
+                    <div class="mb-3 border-bottom pb-3">
+                        <label class="form-label fw-bold">${columnName}</label>
+                        <select class="form-select form-select-lg mb-2 x-axis-aggregation border border-dark" data-column="${columnName}" id="x-agg-${columnName.replace(/\s+/g, '-')}" style="background-color: #f8f9fa; font-weight: 500;">
+                            <option value="">No Aggregation (Default)</option>
+                `;
+
+                // Add options for each available aggregation
+                availableAggregations.forEach(function(agg) {
+                    const aggDisplayName = getAggregationDisplayName(agg);
+                    html += `<option value="${agg}">${aggDisplayName}</option>`;
+                });
+
+                html += `
+                        </select>
+                        <small class="text-muted">Choose how to aggregate this variable</small>
+                    </div>
+                `;
+            }
+        });
+
+        $('#x-axis-aggregation-container').html(html);
+        console.log("X-axis aggregation HTML updated");
+
+        // Add event listener to detect changes in aggregation
+        $('.x-axis-aggregation').on('change', function() {
+            const column = $(this).data('column');
+            const aggregation = $(this).val();
+            console.log(`Aggregation for ${column} set to: ${aggregation}`);
+
+            // Remove any existing feedback for this dropdown
+            $(this).next('.aggregation-feedback').remove();
+
+            // Show visual feedback
+            if (aggregation) {
+                $(this).addClass('border-primary');
+                $(this).after(`<div class="alert alert-success mt-2 aggregation-feedback">
+                    <i class="fas fa-check-circle"></i> ${getAggregationDisplayName(aggregation)} will be applied to ${column}
+                </div>`);
+            } else {
+                $(this).removeClass('border-primary');
+            }
+
+            // Update aggregation summary
+            updateAggregationSummary();
+        });
+    }
+
+    // Function to update Y-Axis aggregation options
+    function updateYAxisAggregations(yAxisValues) {
+        console.log("Updating Y-Axis aggregations with:", yAxisValues);
+
+        // Clear existing content
+        $('#y-axis-aggregation-container').empty();
+
+        // Ensure yAxisValues is an array
+        if (!yAxisValues) {
+            $('#y-axis-aggregation-container').html('<p class="text-muted">Select Y-Axis variable(s) first</p>');
+            return;
+        }
+
+        // Convert to array if it's a single value
+        const yAxisArray = Array.isArray(yAxisValues) ? yAxisValues : [yAxisValues];
+
+        if (yAxisArray.length === 0) {
+            $('#y-axis-aggregation-container').html('<p class="text-muted">Select Y-Axis variable(s) first</p>');
+            return;
+        }
+
+        // Clear any existing Y-axis aggregations that are not in the current selection
+        $('.y-axis-aggregation').each(function() {
+            const column = $(this).data('column');
+            if (!yAxisArray.includes(column)) {
+                // Remove aggregation for columns that are no longer selected
+                $(this).val('');
+                $(this).removeClass('border-primary');
+                $(this).next('.aggregation-feedback').remove();
+            }
+        });
+
+        // Create aggregation options for each selected y-axis variable
+        let html = '';
+
+        // Add a header
+        if (yAxisArray.length > 1) {
+            html += '<div class="alert alert-info mb-3">Select aggregation for each Y-axis variable:</div>';
+        }
+
+        yAxisArray.forEach(function(columnName) {
+            console.log("Processing Y-axis column:", columnName);
+
+            if (currentDataset && currentDataset.columns[columnName]) {
+                const column = currentDataset.columns[columnName];
+
+                // Get available aggregations for this column as Y-axis
+                let availableAggregations = getAvailableAggregations(column, 'y');
+                console.log(`Available Y-axis aggregations for ${columnName}:`, availableAggregations);
+
+                // Create a select dropdown for this column
+                html += `
+                    <div class="mb-3 border-bottom pb-3">
+                        <label class="form-label fw-bold">${columnName}</label>
+                        <select class="form-select form-select-lg mb-2 y-axis-aggregation border border-dark" data-column="${columnName}" id="y-agg-${columnName.replace(/\s+/g, '-')}" style="background-color: #f8f9fa; font-weight: 500;">
+                            <option value="">No Aggregation (Default)</option>
+                `;
+
+                // Add options for each available aggregation
+                availableAggregations.forEach(function(agg) {
+                    const aggDisplayName = getAggregationDisplayName(agg);
+                    html += `<option value="${agg}">${aggDisplayName}</option>`;
+                });
+
+                html += `
+                        </select>
+                        <small class="text-muted">Choose how to aggregate this variable</small>
+                    </div>
+                `;
+            }
+        });
+
+        $('#y-axis-aggregation-container').html(html);
+        console.log("Y-axis aggregation HTML updated");
+
+        // Add event listener to detect changes in aggregation
+        $('.y-axis-aggregation').on('change', function() {
+            const column = $(this).data('column');
+            const aggregation = $(this).val();
+            console.log(`Aggregation for ${column} set to: ${aggregation}`);
+
+            // Remove any existing feedback for this dropdown
+            $(this).next('.aggregation-feedback').remove();
+
+            // Show visual feedback
+            if (aggregation) {
+                $(this).addClass('border-primary');
+                $(this).after(`<div class="alert alert-success mt-2 aggregation-feedback">
+                    <i class="fas fa-check-circle"></i> ${getAggregationDisplayName(aggregation)} will be applied to ${column}
+                </div>`);
+            } else {
+                $(this).removeClass('border-primary');
+            }
+
+            // Update aggregation summary
+            updateAggregationSummary();
+        });
+    }
+
+    // Function to update the aggregation summary
+    function updateAggregationSummary() {
+        // Get all selected aggregations
+        const xAxisAggregations = {};
+        $('.x-axis-aggregation').each(function() {
+            const column = $(this).data('column');
+            const aggregation = $(this).val();
+            if (aggregation) {
+                xAxisAggregations[column] = aggregation;
+            }
+        });
+
+        const yAxisAggregations = {};
+        $('.y-axis-aggregation').each(function() {
+            const column = $(this).data('column');
+            const aggregation = $(this).val();
+            if (aggregation) {
+                yAxisAggregations[column] = aggregation;
+            }
+        });
+
+        // Check if any aggregations are selected
+        const hasXAxisAggregations = Object.keys(xAxisAggregations).length > 0;
+        const hasYAxisAggregations = Object.keys(yAxisAggregations).length > 0;
+
+        if (hasXAxisAggregations || hasYAxisAggregations) {
+            // Show the summary
+            $('#aggregation-summary').removeClass('d-none');
+
+            // Update X-axis summary
+            if (hasXAxisAggregations) {
+                let xAxisSummary = '<h6 class="mb-2 text-primary"><i class="fas fa-chart-line me-2"></i>X-Axis Aggregations:</h6>';
+                xAxisSummary += '<div class="table-responsive"><table class="table table-sm table-bordered">';
+                xAxisSummary += '<thead class="table-light"><tr><th>Column</th><th>Aggregation</th></tr></thead><tbody>';
+
+                for (const [column, aggregation] of Object.entries(xAxisAggregations)) {
+                    xAxisSummary += `<tr>
+                        <td><strong>${column}</strong></td>
+                        <td><span class="badge bg-info">${getAggregationDisplayName(aggregation)}</span></td>
+                    </tr>`;
+                }
+
+                xAxisSummary += '</tbody></table></div>';
+                $('#x-axis-summary').html(xAxisSummary);
+            } else {
+                $('#x-axis-summary').empty();
+            }
+
+            // Update Y-axis summary
+            if (hasYAxisAggregations) {
+                let yAxisSummary = '<h6 class="mb-2 text-primary"><i class="fas fa-chart-bar me-2"></i>Y-Axis Aggregations:</h6>';
+                yAxisSummary += '<div class="table-responsive"><table class="table table-sm table-bordered">';
+                yAxisSummary += '<thead class="table-light"><tr><th>Column</th><th>Aggregation</th></tr></thead><tbody>';
+
+                for (const [column, aggregation] of Object.entries(yAxisAggregations)) {
+                    yAxisSummary += `<tr>
+                        <td><strong>${column}</strong></td>
+                        <td><span class="badge bg-success">${getAggregationDisplayName(aggregation)}</span></td>
+                    </tr>`;
+                }
+
+                yAxisSummary += '</tbody></table></div>';
+                $('#y-axis-summary').html(yAxisSummary);
+            } else {
+                $('#y-axis-summary').empty();
+            }
+        } else {
+            // Hide the summary if no aggregations are selected
+            $('#aggregation-summary').addClass('d-none');
+        }
+    }
+
+    // Function to get available aggregations for a column based on axis
+    function getAvailableAggregations(column, axis) {
+        let availableAggregations = [];
+
+        // Handle date columns differently based on axis
+        if (isDateColumn(column)) {
+            if (axis === 'x') {
+                // For X-axis date columns, only provide time-based aggregations
+                return ['daily', 'monthly', 'quarterly', 'yearly'];
+            } else if (axis === 'y') {
+                // For Y-axis date columns, provide count-based aggregations
+                return ['count', 'unique_count', 'null_count', 'non_null_count'];
+            }
+        }
+
+        // For non-date columns, use the standard logic
+        if (column.available_aggregations && column.available_aggregations.length > 0) {
+            // Use the available aggregations from the column metadata
+            availableAggregations = column.available_aggregations;
+        } else {
+            // Default aggregations based on column type
+            if (isNumericColumn(column)) {
+                availableAggregations = ['sum', 'mean', 'min', 'max', 'count', 'std', 'median'];
+            } else {
+                availableAggregations = ['count', 'unique_count', 'first', 'last'];
+            }
+        }
+
+        return availableAggregations;
+    }
+
+    // Function to get display name for aggregation function
+    function getAggregationDisplayName(agg) {
+        const displayNames = {
+            'sum': 'Sum',
+            'mean': 'Average (Mean)',
+            'min': 'Minimum',
+            'max': 'Maximum',
+            'count': 'Count',
+            'std': 'Standard Deviation',
+            'unique_count': 'Count Unique Values',
+            'median': 'Median',
+            'first': 'First Value',
+            'last': 'Last Value',
+            'daily': 'Daily Aggregation',
+            'monthly': 'Monthly Aggregation',
+            'quarterly': 'Quarterly Aggregation',
+            'yearly': 'Yearly Aggregation'
+        };
+
+        return displayNames[agg] || agg.charAt(0).toUpperCase() + agg.slice(1);
+    }
+
+    // Function to check if a column is a date column
+    function isDateColumn(column) {
+        // Check for explicit date column flag from backend
+        if (column.date_column === true) {
+            return true;
+        }
+
+        // Check for inferred data type
+        if (column.inferred_data_type === 'datetime') {
+            return true;
+        }
+
+        // Check data type
+        const dateTypes = ['date', 'datetime', 'timestamp', 'time'];
+        const dataType = column.data_type || column.polars_type || '';
+
+        // Check if the data type contains any of the date types
+        if (dateTypes.some(type => dataType.toLowerCase().includes(type.toLowerCase()))) {
+            return true;
+        }
+
+        // Check sample data for date-like strings
+        if (column.sample_data && Array.isArray(column.sample_data)) {
+            // Common date patterns
+            const datePatterns = [
+                /^\d{4}-\d{2}-\d{2}$/,                  // YYYY-MM-DD
+                /^\d{1,2}\/\d{1,2}\/\d{4}$/,            // MM/DD/YYYY or DD/MM/YYYY
+                /^\d{1,2}\.\d{1,2}\.\d{4}$/,            // DD.MM.YYYY
+                /^\d{1,2}-\d{1,2}-\d{4}$/,              // DD-MM-YYYY
+                /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}/,    // YYYY-MM-DD HH:MM
+                /^\d{1,2}\/\d{1,2}\/\d{4}\s+\d{1,2}:\d{2}/ // MM/DD/YYYY HH:MM
+            ];
+
+            // Check if most sample values match date patterns
+            const dateCount = column.sample_data.filter(val => {
+                if (typeof val !== 'string') return false;
+                return datePatterns.some(pattern => pattern.test(val));
+            }).length;
+
+            // If more than 80% of samples look like dates, consider it a date column
+            if (dateCount > column.sample_data.length * 0.8) {
+                console.log(`Column ${column.name || 'unknown'} appears to contain dates based on sample data`);
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    // Function to get CSRF token from cookies
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                // Does this cookie string begin with the name we want?
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
+    // Function to check if a column is numeric
+    function isNumericColumn(column) {
+        const numericTypes = ['int', 'float', 'double', 'Int64', 'Float64', 'Int32', 'Float32', 'number'];
+        const dataType = column.data_type || column.polars_type || '';
+
+        // Check if the data type contains any of the numeric types
+        return numericTypes.some(type => dataType.toLowerCase().includes(type.toLowerCase()));
+    }
+
+    // Function to update form based on selections
+    function updateFormBasedOnSelections() {
+        const xAxisValue = $('#x-axis').val();
+        const yAxisValues = $('#y-axis').val() || [];
+        const chartType = $('#chart-type').val();
+
+        // Enable/disable aggregation based on chart type and selected variables
+        if (chartType === 'pie') {
+            // Pie charts always need aggregation
+            $('#aggregation-function').val('count').prop('disabled', true);
+        } else if (xAxisValue && yAxisValues.length > 0) {
+            // For other chart types, enable aggregation if both axes are selected
+            $('#aggregation-function').prop('disabled', false);
+        }
+
+        // Adjust available chart types based on selected variables
+        if (xAxisValue && yAxisValues.length > 0) {
+            // Get the data type of the x-axis
+            const xAxisType = $(`#x-axis option[value="${xAxisValue}"]`).data('type');
+
+            // Check if x-axis is categorical
+            const isXAxisCategorical = !isNumericDataType(xAxisType);
+
+            // Check if all selected y-axis columns are numeric
+            let allYAxisNumeric = true;
+
+            yAxisValues.forEach(function(yAxisValue) {
+                const yAxisType = $(`#y-axis option[value="${yAxisValue}"]`).data('type');
+                if (!isNumericDataType(yAxisType)) {
+                    allYAxisNumeric = false;
+                }
+            });
+
+            // If x-axis and all y-axis are numeric, enable scatter plot
+            if (!isXAxisCategorical && allYAxisNumeric) {
+                $('#chart-type option[value="scatter"]').prop('disabled', false);
+            } else {
+                // If any is not numeric, disable scatter plot
+                if (chartType === 'scatter') {
+                    $('#chart-type').val('bar');
+                }
+                $('#chart-type option[value="scatter"]').prop('disabled', true);
+            }
+
+            // If x-axis is categorical and all y-axis are numeric, enable pie chart
+            if (isXAxisCategorical && allYAxisNumeric && yAxisValues.length === 1) {
+                $('#chart-type option[value="pie"]').prop('disabled', false);
+            } else {
+                // If x-axis is not categorical or y-axis is not numeric, disable pie chart
+                if (chartType === 'pie') {
+                    $('#chart-type').val('bar');
+                }
+                $('#chart-type option[value="pie"]').prop('disabled', true);
+            }
+
+            // If multiple y-axis variables are selected, show a note
+            if (yAxisValues.length > 1) {
+                // If the note doesn't exist, add it
+                if ($('#multi-y-axis-note').length === 0) {
+                    $('#y-axis').after('<small id="multi-y-axis-note" class="form-text text-info">Multiple variables selected. Chart will show multiple series.</small>');
+                }
+            } else {
+                // Remove the note if it exists
+                $('#multi-y-axis-note').remove();
+            }
+        }
+    }
+
+    // Function to check if a data type is numeric
+    function isNumericDataType(dataType) {
+        const numericTypes = ['int', 'float', 'double', 'Int64', 'Float64', 'Int32', 'Float32', 'number'];
+        return numericTypes.some(type => dataType.toLowerCase().includes(type.toLowerCase()));
+    }
+
+    // Function to generate visualization
+    function generateVisualization(datasetId) {
+        // Get form values
+        const xAxisValues = $('#x-axis').val() || [];
+        const yAxis = $('#y-axis').val();
+        const chartType = $('#chart-type').val();
+        const filterColumn = $('#filter-column').val();
+        const filterValue = $('#filter-value').val();
+
+        // Debug the selected values
+        console.log("Selected X-axis value:", xAxisValues);
+        console.log("X-axis dropdown HTML:", $('#x-axis').html());
+        console.log("Selected option text:", $('#x-axis option:selected').text());
+        console.log("All available columns:", Object.keys(currentDataset.columns));
+
+        // Validate form
+        if (xAxisValues.length === 0 || !yAxis) {
+            alert('Please select both X and Y axis variables');
+            return;
+        }
+
+        // Get aggregation settings for x-axis column
+        const xAxisAggregations = {};
+        $('.x-axis-aggregation').each(function() {
+            const column = $(this).data('column');
+            const aggregation = $(this).val();
+            if (aggregation) {
+                xAxisAggregations[column] = aggregation;
+            }
+        });
+
+        // Get aggregation settings for y-axis columns
+        const yAxisAggregations = {};
+        $('.y-axis-aggregation').each(function() {
+            const column = $(this).data('column');
+            const aggregation = $(this).val();
+            if (aggregation) {
+                yAxisAggregations[column] = aggregation;
+            }
+        });
+
+        // Prepare request data
+        const requestData = {
+            dataset_id: datasetId,
+            x_axis: xAxisValues, // Use the selected X-axis value
+            y_axis: yAxis,
+            chart_type: chartType,
+            x_axis_aggregations: {},
+            y_axis_aggregations: {}
+        };
+
+        // Convert x_axis to string if it's a single value
+        if (Array.isArray(requestData.x_axis) && requestData.x_axis.length === 1) {
+            requestData.x_axis = requestData.x_axis[0];
+        } else if (Array.isArray(requestData.x_axis) && requestData.x_axis.length === 0) {
+            alert('Please select an X-axis variable');
+            return;
+        }
+
+        // Validate that the X-axis column exists in the dataset
+        const xAxisToCheck = typeof requestData.x_axis === 'string' ? requestData.x_axis : (Array.isArray(requestData.x_axis) ? requestData.x_axis[0] : null);
+
+        if (xAxisToCheck && currentDataset && currentDataset.columns) {
+            console.log(`Validating X-axis column: "${xAxisToCheck}"`);
+
+            if (!currentDataset.columns[xAxisToCheck]) {
+                // Show error message if the column doesn't exist
+                alert(`Error: X-axis column "${xAxisToCheck}" doesn't exist in the dataset. Please select a valid column.`);
+
+                // Show available columns
+                let availableColumns = Object.keys(currentDataset.columns).join(', ');
+                console.error(`Available columns: ${availableColumns}`);
+
+                // Highlight the available columns section
+                $('.alert-info').addClass('alert-danger').removeClass('alert-info');
+                setTimeout(() => {
+                    $('.alert-danger').addClass('alert-info').removeClass('alert-danger');
+                }, 3000);
+
+                return; // Stop execution
+            }
+
+            // Only add aggregations for the selected X-axis column
+            if (xAxisAggregations[xAxisToCheck]) {
+                requestData.x_axis_aggregations[xAxisToCheck] = xAxisAggregations[xAxisToCheck];
+            }
+        }
+
+        // Validate that the Y-axis columns exist in the dataset
+        const yAxisArray = Array.isArray(yAxis) ? yAxis : [yAxis];
+        let invalidColumns = [];
+
+        yAxisArray.forEach(column => {
+            if (column && currentDataset && currentDataset.columns && !currentDataset.columns[column]) {
+                invalidColumns.push(column);
+            } else if (column && yAxisAggregations[column]) {
+                // Only add aggregations for valid selected Y-axis columns
+                requestData.y_axis_aggregations[column] = yAxisAggregations[column];
+            }
+        });
+
+        if (invalidColumns.length > 0) {
+            // Show error message if any columns don't exist
+            alert(`Error: Y-axis column(s) "${invalidColumns.join(', ')}" don't exist in the dataset. Please select valid columns.`);
+
+            // Show available columns
+            let availableColumns = Object.keys(currentDataset.columns).join(', ');
+            console.error(`Available columns: ${availableColumns}`);
+
+            // Highlight the available columns section
+            $('.alert-info').addClass('alert-danger').removeClass('alert-info');
+            setTimeout(() => {
+                $('.alert-info').removeClass('alert-danger');
+            }, 3000);
+
+            return; // Stop execution
+        }
+
+        // Debug information
+        console.log("Request data:", requestData);
+        console.log("X-axis aggregations:", requestData.x_axis_aggregations);
+        console.log("Y-axis aggregations:", requestData.y_axis_aggregations);
+
+        // Add filter if provided
+        if (filterColumn && filterValue) {
+            requestData.filter_column = filterColumn;
+            requestData.filter_value = filterValue;
+        }
+
+        // Show loading indicator
+        $('#visualization-container').html(`
+            <div class="text-center py-5">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="mt-2">Generating visualization...</p>
+            </div>
+        `);
+
+        // Make an API call to get the actual data for visualization
+        $.ajax({
+            url: `/dashboard/api/datasets/${datasetId}/visualize/`,
+            type: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify(requestData),
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            success: function(response) {
+                console.log("Visualization API response:", response);
+
+                // Check if this is mock data
+                if (response.is_mock) {
+                    console.warn("Server returned mock data instead of actual data");
+
+                    // Check if the error is related to column not found
+                    const errorMsg = response.error || "Unknown error";
+                    const isColumnNotFoundError = errorMsg.includes("not found in dataset") ||
+                                                 errorMsg.includes("column") ||
+                                                 errorMsg.includes("not found");
+
+                    if (isColumnNotFoundError) {
+                        // Show a more helpful error message for column not found errors
+                        $('#visualization-container').append(`
+                            <div class="alert alert-danger mt-3">
+                                <h5><i class="fas fa-exclamation-triangle"></i> Column Not Found Error</h5>
+                                <p>${errorMsg}</p>
+                                <hr>
+                                <p class="mb-0">Please select different columns for your visualization that exist in the dataset.</p>
+                                <p class="mb-0">The system is showing mock data as a fallback.</p>
+                            </div>
+                        `);
+                    } else {
+                        // Show a generic error message for other errors
+                        $('#visualization-container').append(`
+                            <div class="alert alert-warning mt-3">
+                                <i class="fas fa-info-circle"></i> The server returned mock data. Reason: ${errorMsg}
+                            </div>
+                        `);
+                    }
+                }
+
+                createVisualization(requestData, response);
+            },
+            error: function(xhr, status, error) {
+                console.error('Error generating visualization:', error);
+
+                // Show error message
+                $('#visualization-container').html(`
+                    <div class="alert alert-danger">
+                        <h5>Error generating visualization</h5>
+                        <p>${xhr.responseJSON?.error || error || 'Unknown error'}</p>
+                        <p class="mt-2">Falling back to mock data visualization...</p>
+                    </div>
+                `);
+
+                // Fall back to mock visualization after showing the error
+                setTimeout(() => {
+                    createMockVisualization(requestData);
+                }, 2000);
+            }
+        });
+    }
+
+    // Function to create a visualization with actual data
+    function createVisualization(requestData, responseData) {
+        // Clear any existing chart
+        if (currentChart) {
+            currentChart.destroy();
+        }
+
+        // Create a canvas for the chart
+        $('#visualization-container').html('<canvas id="chart-canvas"></canvas>');
+        const ctx = document.getElementById('chart-canvas').getContext('2d');
+
+        // Create title text based on selected variables
+        let titleText = '';
+        if (Array.isArray(requestData.x_axis)) {
+            if (requestData.x_axis.length === 1) {
+                titleText = `${requestData.y_axis} by ${requestData.x_axis[0]}`;
+            } else {
+                titleText = `${requestData.y_axis} by ${requestData.x_axis.length} variables`;
+            }
+        } else {
+            titleText = `${requestData.y_axis} by ${requestData.x_axis}`;
+        }
+
+        // Add y-axis aggregations to title if present
+        const yAxisAggCount = Object.keys(requestData.y_axis_aggregations || {}).length;
+        if (yAxisAggCount > 0) {
+            titleText += ` (${yAxisAggCount} y-axis aggregation${yAxisAggCount > 1 ? 's' : ''} applied)`;
+        }
+
+        // Add note about x-axis aggregations if present
+        const xAxisAggCount = Object.keys(requestData.x_axis_aggregations || {}).length;
+        if (xAxisAggCount > 0) {
+            titleText += ` (${xAxisAggCount} x-axis aggregation${xAxisAggCount > 1 ? 's' : ''} applied)`;
+        }
+
+        // Check if we have time-based aggregation data
+        const hasTimeAggregation = responseData.chart_data &&
+                                  responseData.chart_data.datasets &&
+                                  responseData.chart_data.datasets[0] &&
+                                  responseData.chart_data.datasets[0].data &&
+                                  typeof responseData.chart_data.datasets[0].data === 'object' &&
+                                  responseData.chart_data.datasets[0].data.type &&
+                                  responseData.chart_data.datasets[0].data.periods;
+
+        // Handle time-based aggregation data
+        if (hasTimeAggregation) {
+            const timeData = responseData.chart_data.datasets[0].data;
+
+            // Update title with time aggregation type
+            titleText = `${timeData.type} Distribution of ${requestData.y_axis}`;
+
+            // Create a new chart data structure for time-based data
+            const chartData = {
+                labels: timeData.periods,
+                datasets: [{
+                    label: `${timeData.type} Count`,
+                    data: timeData.counts,
+                    backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                    borderColor: 'rgba(54, 162, 235, 1)',
+                    borderWidth: 1
+                }]
+            };
+
+            // Create the chart with time-based data
+            currentChart = new Chart(ctx, {
+                type: 'bar', // Bar chart works well for time distributions
+                data: chartData,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: titleText
+                        },
+                        legend: {
+                            position: 'top',
+                        }
+                    },
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: timeData.type + ' Period'
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Count'
+                            },
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        } else {
+            // Create the chart with the regular data
+            currentChart = new Chart(ctx, {
+                type: requestData.chart_type,
+                data: responseData.chart_data,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: titleText
+                        },
+                        legend: {
+                            position: 'top',
+                        },
+                        tooltip: {
+                            callbacks: {
+                                title: function(tooltipItems) {
+                                    // For multi-axis, show all dimensions in tooltip
+                                    if (Array.isArray(requestData.x_axis) && requestData.x_axis.length > 1) {
+                                        const dataIndex = tooltipItems[0].dataIndex;
+                                        return responseData.chart_data.tooltipTitles ?
+                                            responseData.chart_data.tooltipTitles[dataIndex] :
+                                            tooltipItems[0].label;
+                                    }
+                                    return tooltipItems[0].label;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: Array.isArray(requestData.x_axis) ? requestData.x_axis[0] : requestData.x_axis,
+                                font: {
+                                    weight: 'bold',
+                                    size: 14
+                                }
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: Array.isArray(requestData.y_axis) ?
+                                    (requestData.y_axis.length > 1 ? 'Multiple Y Variables' : requestData.y_axis[0]) :
+                                    requestData.y_axis,
+                                font: {
+                                    weight: 'bold',
+                                    size: 14
+                                }
+                            },
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+
+        // If there's additional information in the response, display it
+        if (responseData.summary) {
+            let summaryHtml = '<div class="mt-4 p-3 bg-light rounded">';
+            summaryHtml += '<h6>Data Summary</h6>';
+            summaryHtml += '<ul class="mb-0">';
+
+            if (responseData.summary.total_rows) {
+                summaryHtml += `<li>Total rows: ${responseData.summary.total_rows}</li>`;
+            }
+
+            if (responseData.summary.filtered_rows) {
+                summaryHtml += `<li>Filtered rows: ${responseData.summary.filtered_rows}</li>`;
+            }
+
+            if (responseData.summary.aggregation_info) {
+                summaryHtml += `<li>Aggregation: ${responseData.summary.aggregation_info}</li>`;
+            }
+
+            summaryHtml += '</ul></div>';
+
+            // Append the summary after the chart
+            $('#visualization-container').append(summaryHtml);
+        }
+    }
+
+    // Function to create a mock visualization (for demo purposes)
+    function createMockVisualization(requestData) {
+        // Clear any existing chart
+        if (currentChart) {
+            currentChart.destroy();
+        }
+
+        // Create a canvas for the chart
+        $('#visualization-container').html('<canvas id="chart-canvas"></canvas>');
+        const ctx = document.getElementById('chart-canvas').getContext('2d');
+
+        // Generate mock data based on the request
+        const mockData = generateMockData(requestData);
+
+        // Create title text based on selected variables
+        let titleText = '';
+        if (Array.isArray(requestData.x_axis)) {
+            if (requestData.x_axis.length === 1) {
+                titleText = `${requestData.y_axis} by ${requestData.x_axis[0]}`;
+            } else {
+                titleText = `${requestData.y_axis} by ${requestData.x_axis.length} variables`;
+            }
+        } else {
+            titleText = `${requestData.y_axis} by ${requestData.x_axis}`;
+        }
+
+        // Add y-axis aggregations to title if present
+        const yAxisAggCount = Object.keys(requestData.y_axis_aggregations || {}).length;
+        if (yAxisAggCount > 0) {
+            titleText += ` (${yAxisAggCount} y-axis aggregation${yAxisAggCount > 1 ? 's' : ''} applied)`;
+        }
+
+        // Add note about x-axis aggregations if present
+        const xAxisAggCount = Object.keys(requestData.x_axis_aggregations || {}).length;
+        if (xAxisAggCount > 0) {
+            titleText += ` (${xAxisAggCount} x-axis aggregation${xAxisAggCount > 1 ? 's' : ''} applied)`;
+        }
+
+        // Add note that this is mock data
+        titleText += ' (Mock Data)';
+
+        // Create the chart
+        currentChart = new Chart(ctx, {
+            type: requestData.chart_type,
+            data: mockData,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: titleText
+                    },
+                    legend: {
+                        position: 'top',
+                    },
+                    tooltip: {
+                        callbacks: {
+                            title: function(tooltipItems) {
+                                // For multi-axis, show all dimensions in tooltip
+                                if (Array.isArray(requestData.x_axis) && requestData.x_axis.length > 1) {
+                                    const dataIndex = tooltipItems[0].dataIndex;
+                                    return mockData.tooltipTitles ? mockData.tooltipTitles[dataIndex] : tooltipItems[0].label;
+                                }
+                                return tooltipItems[0].label;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: Array.isArray(requestData.x_axis) ? requestData.x_axis[0] : requestData.x_axis,
+                            font: {
+                                weight: 'bold',
+                                size: 14
+                            }
+                        }
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: Array.isArray(requestData.y_axis) ?
+                                (requestData.y_axis.length > 1 ? 'Multiple Y Variables' : requestData.y_axis[0]) :
+                                requestData.y_axis,
+                            font: {
+                                weight: 'bold',
+                                size: 14
+                            }
+                        },
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+
+        // Add a note that this is mock data
+        $('#visualization-container').append(`
+            <div class="alert alert-warning mt-3">
+                <i class="fas fa-info-circle"></i> This visualization uses mock data. In a production environment, it would use actual data from the dataset.
+            </div>
+        `);
+    }
+
+    // Function to generate mock data for visualization
+    function generateMockData(requestData) {
+        // Colors for datasets
+        const backgroundColors = [
+            'rgba(255, 99, 132, 0.5)',
+            'rgba(54, 162, 235, 0.5)',
+            'rgba(255, 206, 86, 0.5)',
+            'rgba(75, 192, 192, 0.5)',
+            'rgba(153, 102, 255, 0.5)',
+            'rgba(255, 159, 64, 0.5)',
+            'rgba(201, 203, 207, 0.5)',
+            'rgba(255, 99, 255, 0.5)'
+        ];
+
+        const borderColors = [
+            'rgba(255, 99, 132, 1)',
+            'rgba(54, 162, 235, 1)',
+            'rgba(255, 206, 86, 1)',
+            'rgba(75, 192, 192, 1)',
+            'rgba(153, 102, 255, 1)',
+            'rgba(255, 159, 64, 1)',
+            'rgba(201, 203, 207, 1)',
+            'rgba(255, 99, 255, 1)'
+        ];
+
+        // Handle single x-axis variable
+        if (!Array.isArray(requestData.x_axis) || requestData.x_axis.length === 1) {
+            const xAxisName = Array.isArray(requestData.x_axis) ? requestData.x_axis[0] : requestData.x_axis;
+            const xAxisColumn = currentDataset.columns[xAxisName];
+            const yAxisColumn = currentDataset.columns[requestData.y_axis];
+
+            // Generate labels (x-axis values)
+            let labels = [];
+            if (xAxisColumn.sample_data && xAxisColumn.sample_data.length > 0) {
+                // Use sample data if available
+                labels = [...new Set(xAxisColumn.sample_data)].slice(0, 5);
+            } else {
+                // Generate mock labels
+                labels = ['Category 1', 'Category 2', 'Category 3', 'Category 4', 'Category 5'];
+            }
+
+            // Generate data (y-axis values)
+            const data = labels.map(() => Math.floor(Math.random() * 100));
+
+            // Create dataset object
+            const datasets = [{
+                label: requestData.y_axis,
+                data: data,
+                backgroundColor: requestData.chart_type === 'pie' ? backgroundColors : backgroundColors[0],
+                borderColor: requestData.chart_type === 'pie' ? borderColors : borderColors[0],
+                borderWidth: 1
+            }];
+
+            // Return the data object
+            return {
+                labels: labels,
+                datasets: datasets
+            };
+        }
+        // Handle multiple x-axis variables
+        else {
+            // For multiple x-axis variables, we'll create a grouped chart
+            // Each x-axis variable will be a separate dataset
+
+            // Generate common labels (we'll use the first x-axis variable's values)
+            const firstXAxisColumn = currentDataset.columns[requestData.x_axis[0]];
+            let commonLabels = [];
+
+            if (firstXAxisColumn.sample_data && firstXAxisColumn.sample_data.length > 0) {
+                // Use sample data if available
+                commonLabels = [...new Set(firstXAxisColumn.sample_data)].slice(0, 3);
+            } else {
+                // Generate mock labels
+                commonLabels = ['Category 1', 'Category 2', 'Category 3'];
+            }
+
+            // Create datasets for each x-axis variable
+            const datasets = [];
+            const tooltipTitles = [];
+
+            // For each data point, create a tooltip title that shows all dimensions
+            for (let i = 0; i < commonLabels.length; i++) {
+                let tooltipTitle = '';
+                requestData.x_axis.forEach((xAxisName, index) => {
+                    tooltipTitle += `${xAxisName}: ${commonLabels[i]}${index < requestData.x_axis.length - 1 ? '\n' : ''}`;
+                });
+                tooltipTitles.push(tooltipTitle);
+            }
+
+            requestData.x_axis.forEach((xAxisName, index) => {
+                // Generate data for this x-axis variable
+                const data = commonLabels.map(() => Math.floor(Math.random() * 100));
+
+                // Check if this column has an aggregation
+                const aggregation = requestData.x_axis_aggregations && requestData.x_axis_aggregations[xAxisName];
+
+                datasets.push({
+                    label: aggregation ?
+                        `${xAxisName} (${getAggregationDisplayName(aggregation)})` :
+                        xAxisName,
+                    data: data,
+                    backgroundColor: backgroundColors[index % backgroundColors.length],
+                    borderColor: borderColors[index % borderColors.length],
+                    borderWidth: 1
+                });
+            });
+
+            // Return the data object with tooltip titles
+            return {
+                labels: commonLabels,
+                datasets: datasets,
+                tooltipTitles: tooltipTitles
+            };
+        }
+    }
+
+    // Function to delete a dataset
+    function deleteDataset(datasetId) {
+        $.ajax({
+            url: `/dashboard/api/datasets/${datasetId}/`,
+            type: 'DELETE',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            success: function(response) {
+                // Redirect to datasets list
+                window.location.href = '/dashboard/datasets/';
+            },
+            error: function(xhr, status, error) {
+                console.error('Error deleting dataset:', error);
+
+                // Show error message
+                const alert = `
+                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                        Error deleting dataset: ${xhr.responseJSON?.error || error}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                `;
+                $('.card-body').prepend(alert);
+            }
+        });
+    }
+
+    // Function to get CSRF token
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+</script>
+{% endblock %}

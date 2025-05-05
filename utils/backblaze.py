@@ -1,7 +1,7 @@
 from django.conf import settings
 from b2sdk.v2 import InMemoryAccountInfo, B2Api
 import time
-import pandas as pd
+# import pandas as pd
 import requests
 from io import BytesIO
 import polars as pl
@@ -104,11 +104,11 @@ b2_api.authorize_account('production', KEY_ID, KEY_APPLICATION_KEY)
 
 def upload_file_to_b2(file_path, filename, valid_duration=3600, extract_metadata=False):
     """
-    Reads an Excel file, converts it to Parquet, and uploads it to Backblaze B2.
+    Reads a CSV or Excel file, converts it to Parquet, and uploads it to Backblaze B2.
 
     Args:
-        file_path (str): The local path to the Excel file.
-        filename (str): The name to store the file as in B2 (without extension).
+        file_path (str): The local path to the file (CSV or Excel).
+        filename (str): The name to store the file as in B2.
         valid_duration (int): Time in seconds for which the pre-signed URL is valid.
         extract_metadata (bool): Whether to extract and return metadata about the file.
 
@@ -117,9 +117,40 @@ def upload_file_to_b2(file_path, filename, valid_duration=3600, extract_metadata
               otherwise just the pre-signed URL as a string.
     """
     from utils.aggregate import extract_dataset_metadata
+    import os
 
-    # Read Excel file using Polars (faster than Pandas)
-    df = pl.read_excel(file_path, engine="openpyxl")
+    # Determine file type based on extension (case-insensitive)
+    file_extension = os.path.splitext(filename.lower())[1]
+
+    # Read file based on its extension
+    if file_extension in ['.xlsx', '.xls']:
+        # Read Excel file using Polars
+        try:
+            df = pl.read_excel(file_path, engine="openpyxl")
+        except Exception as e:
+            print(f"Error reading Excel file: {str(e)}")
+            raise
+    elif file_extension == '.csv':
+        # Read CSV file using Polars
+        try:
+            # Try to infer delimiter and other parameters
+            df = pl.read_csv(file_path, infer_schema_length=10000)
+        except Exception as e:
+            print(f"Error reading CSV file: {str(e)}")
+            # Fallback to common delimiters if inference fails
+            try:
+                df = pl.read_csv(file_path, separator=',')
+            except:
+                try:
+                    df = pl.read_csv(file_path, separator=';')
+                except:
+                    try:
+                        df = pl.read_csv(file_path, separator='\t')
+                    except Exception as e2:
+                        print(f"Failed to read CSV with common delimiters: {str(e2)}")
+                        raise
+    else:
+        raise ValueError(f"Unsupported file type: {file_extension}. Only .csv, .xlsx, and .xls are supported.")
 
     # Extract metadata if requested
     metadata = None
@@ -134,8 +165,9 @@ def upload_file_to_b2(file_path, filename, valid_duration=3600, extract_metadata
     # Get bucket info
     bucket = b2_api.get_bucket_by_name(BUCKET_NAME)
 
-    # Define new Parquet filename
-    parquet_filename = filename.replace(".xlsx", ".parquet")
+    # Define new Parquet filename (preserve original name but change extension)
+    base_filename = os.path.splitext(filename)[0]
+    parquet_filename = f"{base_filename}.parquet"
 
     # Upload Parquet file
     bucket.upload_bytes(parquet_buffer.getvalue(), parquet_filename)
@@ -172,21 +204,39 @@ def upload_file_to_b2(file_path, filename, valid_duration=3600, extract_metadata
         return pre_signed_url
 
 def get_file_from_backblaze(file_name):
+    """
+    Retrieves a file from Backblaze B2 and loads it into a Polars DataFrame.
+
+    Args:
+        file_name (str): The name of the file to retrieve.
+
+    Returns:
+        pl.LazyFrame: A Polars LazyFrame containing the file data.
+    """
+    import os
+
     bucket = b2_api.get_bucket_by_name(BUCKET_NAME)
-    # Define new Parquet filename
-    parquet_filename = file_name.replace(".xlsx", ".parquet")
-    # Generate a pre-signed URL for the file
-    # pre_signed_url = f"https://f005.backblazeb2.com/file/{BUCKET_NAME}/{parquet_filename}?Authorization={auth_token}"
-    # Download the file into memory
-    # file_key=f"file/{BUCKET_NAME}/{parquet_filename}"
-    downloaded_file = bucket.download_file_by_name(parquet_filename)
-    file_content = BytesIO()
-    downloaded_file.save(file_content)
-    file_content.seek(0)
-    # Read the Parquet file directly into a Polars DataFrame
-    # df = pl.read_parquet(file_content) #dataframe
-    df = pl.scan_parquet(file_content)
-    return df
+
+    # Determine file extension (case-insensitive)
+    file_extension = os.path.splitext(file_name.lower())[1]
+
+    # Define Parquet filename based on original file extension
+    base_filename = os.path.splitext(file_name)[0]
+    parquet_filename = f"{base_filename}.parquet"
+
+    try:
+        # Download the file into memory
+        downloaded_file = bucket.download_file_by_name(parquet_filename)
+        file_content = BytesIO()
+        downloaded_file.save(file_content)
+        file_content.seek(0)
+
+        # Read the Parquet file into a Polars LazyFrame for efficient processing
+        df = pl.scan_parquet(file_content)
+        return df
+    except Exception as e:
+        print(f"Error retrieving file from Backblaze: {str(e)}")
+        raise ValueError(f"Failed to retrieve file {file_name} from Backblaze: {str(e)}")
 
 
 def upload_file_to_s3(file_path,cleaned_name,useremail):
