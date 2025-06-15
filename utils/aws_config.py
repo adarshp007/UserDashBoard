@@ -1,32 +1,31 @@
 import os
+import tempfile
+from datetime import datetime
+
 import boto3
 from botocore.client import Config
 from botocore.exceptions import ClientError
 
 from django.conf import settings
-from datetime import datetime
-import tempfile
-
 
 
 def get_boto_client():
     session = boto3.Session(
-        aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-        aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY
+        aws_access_key_id=settings.AWS_ACCESS_KEY_ID, aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY
     )
     config = Config(
-        signature_version='s3v4',
+        signature_version="s3v4",
         retries={
-            'total_max_attempts': 3,  # Retry up to 3 times for faster error handling
-            'mode': 'standard'  # Standard retry mode for quicker retries
+            "total_max_attempts": 3,  # Retry up to 3 times for faster error handling
+            "mode": "standard",  # Standard retry mode for quicker retries
         },
-        read_timeout=200  # Set the read timeout to 120 seconds
+        read_timeout=200,  # Set the read timeout to 120 seconds
     )
-    s3 = session.client('s3', endpoint_url=settings.AWS_ENDPOINT, config=config)
+    s3 = session.client("s3", endpoint_url=settings.AWS_ENDPOINT, config=config)
     return s3
 
 
-def upload_temp_file(request,file):
+def upload_temp_file(request, file):
     s3 = get_boto_client()
     original_filename = file.name
     # Generate a timestamp and append it to the filename
@@ -48,6 +47,7 @@ def upload_temp_file(request,file):
     os.remove(temp_file_path)
     return s3_path
 
+
 def upload_file_to_s3(file_path, clean_filename, user_email="admin"):
     """
     Upload a file to S3/Minio.
@@ -68,6 +68,7 @@ def upload_file_to_s3(file_path, clean_filename, user_email="admin"):
         raise e
     return s3_path
 
+
 def detect_and_convert_date_columns(df):
     """
     Detects and converts string columns that contain date values to datetime type.
@@ -78,21 +79,22 @@ def detect_and_convert_date_columns(df):
     Returns:
         pl.DataFrame: DataFrame with date columns converted to datetime type
     """
-    import polars as pl
     import re
+
+    import polars as pl
 
     # Common date patterns to check
     date_patterns = [
         # ISO format: YYYY-MM-DD
-        r'^\d{4}-\d{2}-\d{2}$',
+        r"^\d{4}-\d{2}-\d{2}$",
         # US format: MM/DD/YYYY
-        r'^\d{1,2}/\d{1,2}/\d{4}$',
+        r"^\d{1,2}/\d{1,2}/\d{4}$",
         # European format: DD/MM/YYYY
-        r'^\d{1,2}\.\d{1,2}\.\d{4}$',
-        r'^\d{1,2}-\d{1,2}-\d{4}$',
+        r"^\d{1,2}\.\d{1,2}\.\d{4}$",
+        r"^\d{1,2}-\d{1,2}-\d{4}$",
         # With time component
-        r'^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}',
-        r'^\d{1,2}/\d{1,2}/\d{4}\s+\d{1,2}:\d{2}'
+        r"^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}",
+        r"^\d{1,2}/\d{1,2}/\d{4}\s+\d{1,2}:\d{2}",
     ]
 
     # Function to check if a string matches any date pattern
@@ -117,14 +119,13 @@ def detect_and_convert_date_columns(df):
                 print(f"Converting column '{col_name}' to datetime type")
                 try:
                     # Try to convert to datetime
-                    df = df.with_columns(
-                        pl.col(col_name).str.to_datetime(strict=False).alias(col_name)
-                    )
+                    df = df.with_columns(pl.col(col_name).str.to_datetime(strict=False).alias(col_name))
                     print(f"Successfully converted '{col_name}' to datetime")
                 except Exception as e:
                     print(f"Failed to convert '{col_name}' to datetime: {str(e)}")
 
     return df
+
 
 def upload_dataset_to_s3(file_path, filename, extract_metadata=False):
     """
@@ -139,23 +140,25 @@ def upload_dataset_to_s3(file_path, filename, extract_metadata=False):
         dict: Dictionary containing the S3 URL and metadata if extract_metadata is True,
               otherwise just the S3 URL as a string.
     """
-    from utils.aggregate import extract_dataset_metadata
     import os
-    import polars as pl
     from io import BytesIO
+
+    import polars as pl
+
+    from utils.aggregate import extract_dataset_metadata
 
     # Determine file type based on extension (case-insensitive)
     file_extension = os.path.splitext(filename.lower())[1]
 
     # Read file based on its extension
-    if file_extension in ['.xlsx', '.xls']:
+    if file_extension in [".xlsx", ".xls"]:
         # Read Excel file using Polars
         try:
             df = pl.read_excel(file_path, engine="openpyxl")
         except Exception as e:
             print(f"Error reading Excel file: {str(e)}")
             raise
-    elif file_extension == '.csv':
+    elif file_extension == ".csv":
         # Read CSV file using Polars
         try:
             # Try to infer delimiter and other parameters
@@ -164,13 +167,13 @@ def upload_dataset_to_s3(file_path, filename, extract_metadata=False):
             print(f"Error reading CSV file: {str(e)}")
             # Fallback to common delimiters if inference fails
             try:
-                df = pl.read_csv(file_path, separator=',')
+                df = pl.read_csv(file_path, separator=",")
             except:
                 try:
-                    df = pl.read_csv(file_path, separator=';')
+                    df = pl.read_csv(file_path, separator=";")
                 except:
                     try:
-                        df = pl.read_csv(file_path, separator='\t')
+                        df = pl.read_csv(file_path, separator="\t")
                     except Exception as e2:
                         print(f"Failed to read CSV with common delimiters: {str(e2)}")
                         raise
@@ -199,7 +202,7 @@ def upload_dataset_to_s3(file_path, filename, extract_metadata=False):
     parquet_filename = f"{base_filename}.parquet"
 
     # Define S3 path
-    s3_path = f'datasets/{parquet_filename}'
+    s3_path = f"datasets/{parquet_filename}"
 
     # Upload Parquet file to S3
     try:
@@ -212,18 +215,14 @@ def upload_dataset_to_s3(file_path, filename, extract_metadata=False):
         print("S3 URL:", url)
 
         if extract_metadata:
-            return {
-                "url": url,
-                "filename": parquet_filename,
-                "s3_path": s3_path,
-                "metadata": metadata
-            }
+            return {"url": url, "filename": parquet_filename, "s3_path": s3_path, "metadata": metadata}
         else:
             return url
 
     except Exception as e:
         print(f"Error uploading to S3: {str(e)}")
         raise
+
 
 def get_file_from_s3(file_name):
     """
@@ -236,8 +235,9 @@ def get_file_from_s3(file_name):
         pl.LazyFrame: A Polars LazyFrame containing the file data.
     """
     import os
-    import polars as pl
     from io import BytesIO
+
+    import polars as pl
 
     # Get S3 client
     s3 = get_boto_client()
@@ -246,14 +246,14 @@ def get_file_from_s3(file_name):
     file_extension = os.path.splitext(file_name.lower())[1]
 
     # Define Parquet filename based on original file extension
-    if file_extension != '.parquet':
+    if file_extension != ".parquet":
         base_filename = os.path.splitext(file_name)[0]
         parquet_filename = f"{base_filename}.parquet"
     else:
         parquet_filename = file_name
 
     # Define S3 path
-    s3_path = f'datasets/{parquet_filename}'
+    s3_path = f"datasets/{parquet_filename}"
 
     try:
         # Download the file into memory

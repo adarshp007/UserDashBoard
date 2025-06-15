@@ -1,8 +1,10 @@
-import requests
 import json
+
+import requests
 
 # Base URL for the API
 BASE_URL = "http://localhost:8000/account/api"
+
 
 def test_login_api():
     """Test the login API endpoint."""
@@ -10,7 +12,7 @@ def test_login_api():
     # Login credentials
     data = {
         "email": "adarsh@beinex.com",  # Replace with your superuser email
-        "password": "Admin@123"  # Replace with your superuser password
+        "password": "Admin@123",  # Replace with your superuser password
     }
 
     # Send the login request
@@ -32,9 +34,7 @@ def test_login_api():
         print(f"Refresh Token: {result['refresh'][:30]}...")
 
         # Test user details endpoint with the token
-        headers = {
-            "Authorization": f"Bearer {result['access']}"
-        }
+        headers = {"Authorization": f"Bearer {result['access']}"}
 
         user_response = requests.get(f"{BASE_URL}/user/", headers=headers)
         print("\nUser Details API Response Status:", user_response.status_code)
@@ -47,6 +47,7 @@ def test_login_api():
             print("Error Response:", user_response.json())
     else:
         print("Error Response:", response.json())
+
 
 if __name__ == "__main__":
     print("Testing login API...")

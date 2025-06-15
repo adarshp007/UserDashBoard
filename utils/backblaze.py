@@ -1,10 +1,13 @@
-from django.conf import settings
-from b2sdk.v2 import InMemoryAccountInfo, B2Api
 import time
+from io import BytesIO
+
+import polars as pl
+
 # import pandas as pd
 import requests
-from io import BytesIO
-import polars as pl
+from b2sdk.v2 import B2Api, InMemoryAccountInfo
+
+from django.conf import settings
 
 KEY_ID = settings.__getattr__("BACKBLAZE_KEY_ID")
 KEY_APPLICATION_KEY = settings.__getattr__("BACKBLAZE_APP_KEY")
@@ -15,7 +18,7 @@ info = InMemoryAccountInfo()
 b2_api = B2Api(info)
 
 # Authenticate
-b2_api.authorize_account('production', KEY_ID, KEY_APPLICATION_KEY)
+b2_api.authorize_account("production", KEY_ID, KEY_APPLICATION_KEY)
 
 # def upload_file_to_b2(file_path, filename, valid_duration=3600):
 #     """
@@ -116,21 +119,22 @@ def upload_file_to_b2(file_path, filename, valid_duration=3600, extract_metadata
         dict: Dictionary containing the pre-signed URL and metadata if extract_metadata is True,
               otherwise just the pre-signed URL as a string.
     """
-    from utils.aggregate import extract_dataset_metadata
     import os
+
+    from utils.aggregate import extract_dataset_metadata
 
     # Determine file type based on extension (case-insensitive)
     file_extension = os.path.splitext(filename.lower())[1]
 
     # Read file based on its extension
-    if file_extension in ['.xlsx', '.xls']:
+    if file_extension in [".xlsx", ".xls"]:
         # Read Excel file using Polars
         try:
             df = pl.read_excel(file_path, engine="openpyxl")
         except Exception as e:
             print(f"Error reading Excel file: {str(e)}")
             raise
-    elif file_extension == '.csv':
+    elif file_extension == ".csv":
         # Read CSV file using Polars
         try:
             # Try to infer delimiter and other parameters
@@ -139,13 +143,13 @@ def upload_file_to_b2(file_path, filename, valid_duration=3600, extract_metadata
             print(f"Error reading CSV file: {str(e)}")
             # Fallback to common delimiters if inference fails
             try:
-                df = pl.read_csv(file_path, separator=',')
+                df = pl.read_csv(file_path, separator=",")
             except:
                 try:
-                    df = pl.read_csv(file_path, separator=';')
+                    df = pl.read_csv(file_path, separator=";")
                 except:
                     try:
-                        df = pl.read_csv(file_path, separator='\t')
+                        df = pl.read_csv(file_path, separator="\t")
                     except Exception as e2:
                         print(f"Failed to read CSV with common delimiters: {str(e2)}")
                         raise
@@ -195,13 +199,10 @@ def upload_file_to_b2(file_path, filename, valid_duration=3600, extract_metadata
         print("Failed to download file:", response.status_code, response.text)
 
     if extract_metadata:
-        return {
-            "url": pre_signed_url,
-            "filename": parquet_filename,
-            "metadata": metadata
-        }
+        return {"url": pre_signed_url, "filename": parquet_filename, "metadata": metadata}
     else:
         return pre_signed_url
+
 
 def get_file_from_backblaze(file_name):
     """
@@ -239,6 +240,6 @@ def get_file_from_backblaze(file_name):
         raise ValueError(f"Failed to retrieve file {file_name} from Backblaze: {str(e)}")
 
 
-def upload_file_to_s3(file_path,cleaned_name,useremail):
+def upload_file_to_s3(file_path, cleaned_name, useremail):
 
     return

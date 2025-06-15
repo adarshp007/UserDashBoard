@@ -1,7 +1,10 @@
 import json
 import os
+
 from django.core.management.base import BaseCommand
+
 from Account.models import Entity, Role
+
 
 class Command(BaseCommand):
     help = "Populate database with initial data from JSON"

@@ -1,11 +1,13 @@
-import requests
 import json
 import os
 import time
 
+import requests
+
 # Base URLs for the API
 CREATE_DATASET_URL = "http://localhost:8000/dashboard/createdataset/"
 STATUS_URL = "http://localhost:8000/dashboard/dataset-status/"
+
 
 def test_create_dataset_async():
     """Test the asynchronous dataset creation endpoint."""
@@ -19,14 +21,9 @@ def test_create_dataset_async():
         return
 
     # Prepare the multipart form data
-    files = {
-        'file': open(file_path, 'rb')
-    }
+    files = {"file": open(file_path, "rb")}
 
-    data = {
-        'name': 'Test Dataset',
-        'description': 'A test dataset created via API'
-    }
+    data = {"name": "Test Dataset", "description": "A test dataset created via API"}
 
     # Send the request to create the dataset
     print("Creating dataset...")
@@ -45,7 +42,7 @@ def test_create_dataset_async():
         print(f"Message: {result['message']}")
 
         # Poll the status endpoint to check when processing is complete
-        dataset_id = result['dataset_id']
+        dataset_id = result["dataset_id"]
         status_url = f"{STATUS_URL}{dataset_id}/"
 
         print("\nPolling for dataset status...")
@@ -63,7 +60,7 @@ def test_create_dataset_async():
                     status_result = status_response.json()
                     print(f"Current Status: {status_result['status']}")
 
-                    if status_result['status'] == "READ_COMPLETE":
+                    if status_result["status"] == "READ_COMPLETE":
                         print("\nDataset processing completed successfully!")
 
                         # Print dataset info if available
@@ -86,10 +83,12 @@ def test_create_dataset_async():
 
                                 print(f"\n{column_name}:")
                                 print(f"  Data Type: {column_info['data_type']}")
-                                print(f"  Available Aggregations: {', '.join(column_info['available_aggregations'][:5])}...")
+                                print(
+                                    f"  Available Aggregations: {', '.join(column_info['available_aggregations'][:5])}..."
+                                )
 
                         break
-                    elif status_result['status'] == "READ_FAILED":
+                    elif status_result["status"] == "READ_FAILED":
                         print("\nDataset processing failed!")
                         break
 
@@ -109,6 +108,7 @@ def test_create_dataset_async():
             print(f"You can check the status later at: {status_url}")
     else:
         print("Error Response:", response.json())
+
 
 if __name__ == "__main__":
     print("Testing asynchronous dataset creation endpoint...")

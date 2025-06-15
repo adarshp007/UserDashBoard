@@ -1,12 +1,16 @@
-import os
 import logging
+import os
+
 from celery import shared_task
-from Account.models import Dataset, User
-from utils.aws_config import upload_dataset_to_s3
-from utils.aggregate import extract_dataset_metadata
+
 from django.shortcuts import get_object_or_404
 
+from Account.models import Dataset, User
+from utils.aggregate import extract_dataset_metadata
+from utils.aws_config import upload_dataset_to_s3
+
 logger = logging.getLogger(__name__)
+
 
 @shared_task
 def process_dataset_file(file_path, clean_filename, dataset_id):
@@ -36,7 +40,7 @@ def process_dataset_file(file_path, clean_filename, dataset_id):
         dataset.metadata["file_info"] = {
             "url": result["url"],
             "filename": result["filename"],
-            "s3_path": result["s3_path"]
+            "s3_path": result["s3_path"],
         }
         dataset.status = "READ_COMPLETE"
         dataset.save()
@@ -53,11 +57,7 @@ def process_dataset_file(file_path, clean_filename, dataset_id):
         except Exception as e:
             logger.warning(f"Failed to remove temporary file {file_path}: {str(e)}")
 
-        return {
-            "success": True,
-            "dataset_id": str(dataset_id),
-            "file_url": result["url"]
-        }
+        return {"success": True, "dataset_id": str(dataset_id), "file_url": result["url"]}
 
     except Exception as e:
         logger.error(f"Error processing dataset {dataset_id}: {str(e)}")
@@ -80,8 +80,4 @@ def process_dataset_file(file_path, clean_filename, dataset_id):
         except Exception as cleanup_error:
             logger.warning(f"Failed to remove temporary file {file_path} after error: {str(cleanup_error)}")
 
-        return {
-            "success": False,
-            "dataset_id": str(dataset_id),
-            "error": str(e)
-        }
+        return {"success": False, "dataset_id": str(dataset_id), "error": str(e)}

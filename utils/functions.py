@@ -1,5 +1,6 @@
 import polars as pl
 
+
 def detect_datetime_columns(df: pl.DataFrame) -> list:
     """
     Detects columns in a Polars DataFrame that can be considered as datetime.
@@ -21,9 +22,7 @@ def detect_datetime_columns(df: pl.DataFrame) -> list:
         # Attempt to parse the column as datetime
         try:
             # Try parsing as datetime with a common format
-            parsed = df.with_columns(
-                pl.col(column).str.strptime(pl.Datetime, strict=False)
-            )
+            parsed = df.with_columns(pl.col(column).str.strptime(pl.Datetime, strict=False))
             # If parsing succeeds, add the column to the list
             datetime_columns.append(column)
         except:
@@ -33,9 +32,12 @@ def detect_datetime_columns(df: pl.DataFrame) -> list:
     return datetime_columns
 
 
+from io import StringIO
+
 import polars as pl
 import requests
-from io import StringIO
+
+
 def load_data(url: str) -> pl.DataFrame:
 
     # Stream the response directly
@@ -44,7 +46,7 @@ def load_data(url: str) -> pl.DataFrame:
     # Create a file-like object from the stream
     stream = StringIO()
     for chunk in response.iter_content(chunk_size=8192):
-        stream.write(chunk.decode('utf-8'))
+        stream.write(chunk.decode("utf-8"))
     stream.seek(0)
 
     # Read as LazyFrame

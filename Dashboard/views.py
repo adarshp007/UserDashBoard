@@ -1,23 +1,31 @@
-from django.shortcuts import render
-from django.http import JsonResponse
+import json
+
+import polars as pl
+from rest_framework import status
+from rest_framework.permissions import AllowAny
+
 # from requests import Response
 from rest_framework.response import Response
-from rest_framework import status
-from utils.aws_config import upload_file_to_s3, upload_dataset_to_s3, get_file_from_s3
-from django.views.decorators.csrf import csrf_exempt
-from django.utils.decorators import method_decorator
 from rest_framework.views import APIView
-from rest_framework.permissions import AllowAny
-from .serializers import DatasetCreateSerializer, AggregationRequestSerializer, DatasetSourceSerializer
-from Account.models import User, Dataset
-import polars as pl
-import json
+
+from django.http import JsonResponse
+from django.shortcuts import get_object_or_404, render
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_exempt
+
+from Account.models import Dataset, User
 from utils.aggregate import (
-    perform_aggregations, get_available_aggregations, get_dataset_column_aggregations,
-    get_column_type, perform_axis_based_aggregation
+    get_available_aggregations,
+    get_column_type,
+    get_dataset_column_aggregations,
+    perform_aggregations,
+    perform_axis_based_aggregation,
 )
-from django.shortcuts import get_object_or_404
+from utils.aws_config import get_file_from_s3, upload_dataset_to_s3, upload_file_to_s3
+
+from .serializers import AggregationRequestSerializer, DatasetCreateSerializer, DatasetSourceSerializer
 from .tasks import process_dataset_file
+
 
 # Create your views here.
 @csrf_exempt
@@ -35,24 +43,26 @@ def upload_view(request):
         return JsonResponse({"message": "File uploaded!", "url": file_url})
 
     # For GET requests, render the upload template
-    return render(request, 'dashboard/upload.html')
+    return render(request, "dashboard/upload.html")
+
 
 def datasets_view(request):
     """
     View function for the datasets list page.
     """
-    return render(request, 'dashboard/datasets.html')
+    return render(request, "dashboard/datasets.html")
+
 
 def dataset_detail_view(request, dataset_id):
     """
     View function for the dataset detail page.
     """
-    return render(request, 'dashboard/dataset_detail.html')
+    return render(request, "dashboard/dataset_detail.html")
 
 
-@method_decorator(csrf_exempt, name='dispatch')
+@method_decorator(csrf_exempt, name="dispatch")
 class CraeteDatsetView(APIView):
-    permission_classes=[AllowAny]
+    permission_classes = [AllowAny]
     serializer_class = DatasetCreateSerializer
 
     def post(self, request):
@@ -60,8 +70,8 @@ class CraeteDatsetView(APIView):
         data = request.data.copy()
 
         # Add the file from request.FILES to the data
-        if 'file' in request.FILES:
-            data['file'] = request.FILES['file']
+        if "file" in request.FILES:
+            data["file"] = request.FILES["file"]
 
         serializer = self.serializer_class(data=data)
 
@@ -70,17 +80,17 @@ class CraeteDatsetView(APIView):
                 # Get the uploaded file
                 file = request.FILES.get("file")
                 if not file:
-                    return Response(
-                        {"error": "No file was uploaded"},
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
+                    return Response({"error": "No file was uploaded"}, status=status.HTTP_400_BAD_REQUEST)
 
                 # Trim whitespace and replace spaces with underscores
                 clean_filename = "_".join(file.name.strip().split())
 
                 # Create a media directory if it doesn't exist
                 import os
-                media_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'media', 'uploads')
+
+                media_dir = os.path.join(
+                    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "media", "uploads"
+                )
                 os.makedirs(media_dir, exist_ok=True)
 
                 # Use the media directory for temporary file storage
@@ -95,27 +105,27 @@ class CraeteDatsetView(APIView):
                 print(f"File saved at: {file_path}")
 
                 # Create dataset with initial status
-                dataset = serializer.save(
-                    owner=User.objects.first(),
-                    status="READ_PENDING"
-                )
+                dataset = serializer.save(owner=User.objects.first(), status="READ_PENDING")
 
                 # Launch Celery task to process the file in the background
                 process_dataset_file.delay(file_path, clean_filename, str(dataset.object_id))
 
                 # Return immediate response
-                return Response({
-                    "message": "Dataset creation initiated. Processing in background.",
-                    "dataset": serializer.data,
-                    "dataset_id": str(dataset.object_id),
-                    "status": "READ_PENDING",
-                    "note": "Metadata and aggregation possibilities will be available once processing is complete."
-                }, status=status.HTTP_202_ACCEPTED)
+                return Response(
+                    {
+                        "message": "Dataset creation initiated. Processing in background.",
+                        "dataset": serializer.data,
+                        "dataset_id": str(dataset.object_id),
+                        "status": "READ_PENDING",
+                        "note": "Metadata and aggregation possibilities will be available once processing is complete.",
+                    },
+                    status=status.HTTP_202_ACCEPTED,
+                )
 
             except Exception as e:
                 return Response(
                     {"error": f"Failed to initiate dataset processing: {str(e)}"},
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 )
 
         return Response({"error": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
@@ -134,13 +144,17 @@ class CraeteDatsetView(APIView):
     #     file_url = upload_file_to_s3(file_path,clean_filename,user_email)
     #     return JsonResponse({"success": "Upload success fully"}, status=200)
 
+
 class CreateDashboardView(APIView):
     def post(self, request):
         # Get the dashboard data from the request body
         dashboard_data = request.data
         return
+
+
 class GetDashboardView(APIView):
-    permission_classes=[AllowAny]
+    permission_classes = [AllowAny]
+
     def get(self, request):
         """
         Get aggregated data from a dataset.
@@ -153,11 +167,11 @@ class GetDashboardView(APIView):
 
             # If no dataset_id is provided, get the first available dataset
             if not dataset_id:
-                datasets = Dataset.objects.filter(status="READ_COMPLETE").order_by('-created_date')
+                datasets = Dataset.objects.filter(status="READ_COMPLETE").order_by("-created_date")
                 if not datasets.exists():
                     return Response(
                         {"error": "No datasets available. Please upload a dataset first."},
-                        status=status.HTTP_404_NOT_FOUND
+                        status=status.HTTP_404_NOT_FOUND,
                     )
                 dataset = datasets.first()
             else:
@@ -168,21 +182,19 @@ class GetDashboardView(APIView):
             if dataset.status != "READ_COMPLETE" or not dataset.metadata:
                 return Response(
                     {"error": f"Dataset is not ready for visualization. Status: {dataset.status}"},
-                    status=status.HTTP_400_BAD_REQUEST
+                    status=status.HTTP_400_BAD_REQUEST,
                 )
 
             # Get the file name from the metadata
-            if not dataset.metadata or 'file_info' not in dataset.metadata:
+            if not dataset.metadata or "file_info" not in dataset.metadata:
                 return Response(
-                    {"error": "Dataset metadata not found or incomplete"},
-                    status=status.HTTP_400_BAD_REQUEST
+                    {"error": "Dataset metadata not found or incomplete"}, status=status.HTTP_400_BAD_REQUEST
                 )
 
-            file_name = dataset.metadata['file_info'].get('filename')
+            file_name = dataset.metadata["file_info"].get("filename")
             if not file_name:
                 return Response(
-                    {"error": "File name not found in dataset metadata"},
-                    status=status.HTTP_400_BAD_REQUEST
+                    {"error": "File name not found in dataset metadata"}, status=status.HTTP_400_BAD_REQUEST
                 )
 
             print(f"Using file name from dataset {dataset.name}: {file_name}")
@@ -203,9 +215,9 @@ class GetDashboardView(APIView):
                     "name": dataset.name,
                     "description": dataset.description,
                     "num_rows": df.height,
-                    "num_columns": len(df.columns)
+                    "num_columns": len(df.columns),
                 },
-                "aggregations": {}
+                "aggregations": {},
             }
 
             for column in df.columns:
@@ -226,9 +238,9 @@ class GetDashboardView(APIView):
 
         except Exception as e:
             return Response(
-                {"error": f"Failed to get dashboard data: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                {"error": f"Failed to get dashboard data: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
 
 class CardDetailsView(APIView):
     def get(self, request):
@@ -236,8 +248,10 @@ class CardDetailsView(APIView):
         card_id = request.GET.get("id")
         return
 
+
 class TestDashboardFuctions(APIView):
-    permission_classes=[AllowAny]
+    permission_classes = [AllowAny]
+
     def get(self, request):
         """
         Test function to get detailed statistics about a dataset.
@@ -250,11 +264,11 @@ class TestDashboardFuctions(APIView):
 
             # If no dataset_id is provided, get the first available dataset
             if not dataset_id:
-                datasets = Dataset.objects.filter(status="READ_COMPLETE").order_by('-created_date')
+                datasets = Dataset.objects.filter(status="READ_COMPLETE").order_by("-created_date")
                 if not datasets.exists():
                     return Response(
                         {"error": "No datasets available. Please upload a dataset first."},
-                        status=status.HTTP_404_NOT_FOUND
+                        status=status.HTTP_404_NOT_FOUND,
                     )
                 dataset = datasets.first()
             else:
@@ -265,21 +279,19 @@ class TestDashboardFuctions(APIView):
             if dataset.status != "READ_COMPLETE" or not dataset.metadata:
                 return Response(
                     {"error": f"Dataset is not ready for visualization. Status: {dataset.status}"},
-                    status=status.HTTP_400_BAD_REQUEST
+                    status=status.HTTP_400_BAD_REQUEST,
                 )
 
             # Get the file name from the metadata
-            if not dataset.metadata or 'file_info' not in dataset.metadata:
+            if not dataset.metadata or "file_info" not in dataset.metadata:
                 return Response(
-                    {"error": "Dataset metadata not found or incomplete"},
-                    status=status.HTTP_400_BAD_REQUEST
+                    {"error": "Dataset metadata not found or incomplete"}, status=status.HTTP_400_BAD_REQUEST
                 )
 
-            file_name = dataset.metadata['file_info'].get('filename')
+            file_name = dataset.metadata["file_info"].get("filename")
             if not file_name:
                 return Response(
-                    {"error": "File name not found in dataset metadata"},
-                    status=status.HTTP_400_BAD_REQUEST
+                    {"error": "File name not found in dataset metadata"}, status=status.HTTP_400_BAD_REQUEST
                 )
 
             print(f"Using file name from dataset {dataset.name}: {file_name}")
@@ -299,32 +311,34 @@ class TestDashboardFuctions(APIView):
                     "name": dataset.name,
                     "description": dataset.description,
                     "columns": lf_schema.names(),
-                    "column_types": {name: str(dtype) for name, dtype in lf_schema.items()}
+                    "column_types": {name: str(dtype) for name, dtype in lf_schema.items()},
                 },
-                "statistics": {}
+                "statistics": {},
             }
 
             # Prepare statistics expressions
             stats_exprs = []
             for name, dtype in lf_schema.items():
                 if dtype in (pl.Int64, pl.Int32, pl.Float64, pl.Float32):
-                    stats_exprs.extend([
-                        pl.col(name).mean().round(2).alias(f"{name}_mean"),
-                        pl.col(name).sum().alias(f"{name}_sum"),
-                        pl.col(name).min().alias(f"{name}_min"),
-                        pl.col(name).max().alias(f"{name}_max"),
-                        pl.col(name).std().alias(f"{name}_std")  # Bonus: standard deviation
-                    ])
-                elif dtype == pl.Utf8:
-                    stats_exprs.extend([
-                        pl.col(name).n_unique().alias(f"{name}_unique_count"),
-                        pl.col(name).first().alias(f"{name}_first_sample"),
-                        pl.col(name).len().alias(f"{name}_count")
-                    ])
-                elif dtype == pl.Null:
-                    stats_exprs.append(
-                        pl.col(name).is_null().sum().alias(f"{name}_null_count")
+                    stats_exprs.extend(
+                        [
+                            pl.col(name).mean().round(2).alias(f"{name}_mean"),
+                            pl.col(name).sum().alias(f"{name}_sum"),
+                            pl.col(name).min().alias(f"{name}_min"),
+                            pl.col(name).max().alias(f"{name}_max"),
+                            pl.col(name).std().alias(f"{name}_std"),  # Bonus: standard deviation
+                        ]
                     )
+                elif dtype == pl.Utf8:
+                    stats_exprs.extend(
+                        [
+                            pl.col(name).n_unique().alias(f"{name}_unique_count"),
+                            pl.col(name).first().alias(f"{name}_first_sample"),
+                            pl.col(name).len().alias(f"{name}_count"),
+                        ]
+                    )
+                elif dtype == pl.Null:
+                    stats_exprs.append(pl.col(name).is_null().sum().alias(f"{name}_null_count"))
 
             # Execute the query and collect results
             # This is the correct way to work with LazyFrames
@@ -333,7 +347,7 @@ class TestDashboardFuctions(APIView):
             # Convert to nested JSON structure
             for col in lf_schema.keys():
                 col_stats = {}
-                for stat in ['mean', 'sum', 'min', 'max', 'std', 'unique_count', 'null_count']:
+                for stat in ["mean", "sum", "min", "max", "std", "unique_count", "null_count"]:
                     stat_name = f"{col}_{stat}"
                     if stat_name in stats_df.columns:
                         col_stats[stat] = stats_df[stat_name][0]
@@ -343,8 +357,7 @@ class TestDashboardFuctions(APIView):
 
         except Exception as e:
             return Response(
-                {"error": f"Failed to get dataset statistics: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                {"error": f"Failed to get dataset statistics: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
 
@@ -355,22 +368,26 @@ class DataAggregationView(APIView):
     POST: Perform aggregations on a dataset based on the provided configuration.
     GET: Get information about available aggregation functions.
     """
+
     permission_classes = [AllowAny]
 
     def get(self, request):
         """
         Get information about available aggregation functions.
         """
-        return Response({
-            "available_aggregations": get_available_aggregations(),
-            "usage_example": {
-                "dataset_id": "uuid-of-dataset",  # or "file_name": "filename.xlsx"
-                "aggregations": {
-                    "column1": ["mean", "sum", "min", "max"],
-                    "column2": ["unique_count", "most_frequent"]
-                }
-            }
-        }, status=status.HTTP_200_OK)
+        return Response(
+            {
+                "available_aggregations": get_available_aggregations(),
+                "usage_example": {
+                    "dataset_id": "uuid-of-dataset",  # or "file_name": "filename.xlsx"
+                    "aggregations": {
+                        "column1": ["mean", "sum", "min", "max"],
+                        "column2": ["unique_count", "most_frequent"],
+                    },
+                },
+            },
+            status=status.HTTP_200_OK,
+        )
 
     def post(self, request):
         """
@@ -385,18 +402,18 @@ class DataAggregationView(APIView):
 
         try:
             # Get the dataset based on the provided identifier
-            if 'dataset_id' in validated_data:
+            if "dataset_id" in validated_data:
                 # Get dataset by ID
-                dataset = get_object_or_404(Dataset, object_id=validated_data['dataset_id'])
+                dataset = get_object_or_404(Dataset, object_id=validated_data["dataset_id"])
                 # Get file name from dataset metadata
-                if dataset.metadata and 'file_info' in dataset.metadata:
-                    file_name = dataset.metadata['file_info'].get('filename', None)
+                if dataset.metadata and "file_info" in dataset.metadata:
+                    file_name = dataset.metadata["file_info"].get("filename", None)
                 else:
                     # Fallback to a default name
                     file_name = f"{dataset.name.replace(' ', '_')}.parquet"
             else:
                 # Get dataset by file name
-                file_name = validated_data['file_name']
+                file_name = validated_data["file_name"]
 
             # Get the LazyFrame
             lazy_df = get_file_from_s3(file_name)
@@ -406,15 +423,14 @@ class DataAggregationView(APIView):
             # but we're making it explicit here for clarity
 
             # Perform the aggregations
-            aggregation_config = validated_data['aggregations']
+            aggregation_config = validated_data["aggregations"]
             result = perform_aggregations(lazy_df, aggregation_config)
 
             return Response(result, status=status.HTTP_200_OK)
 
         except Exception as e:
             return Response(
-                {"error": f"Failed to perform aggregations: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                {"error": f"Failed to perform aggregations: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
 
@@ -424,6 +440,7 @@ class DatasetColumnAggregationsView(APIView):
 
     POST: Get available aggregations for each column in a dataset based on its data type.
     """
+
     permission_classes = [AllowAny]
 
     def post(self, request):
@@ -439,18 +456,18 @@ class DatasetColumnAggregationsView(APIView):
 
         try:
             # Get the dataset based on the provided identifier
-            if 'dataset_id' in validated_data:
+            if "dataset_id" in validated_data:
                 # Get dataset by ID
-                dataset = get_object_or_404(Dataset, object_id=validated_data['dataset_id'])
+                dataset = get_object_or_404(Dataset, object_id=validated_data["dataset_id"])
                 # Get file name from dataset metadata
-                if dataset.metadata and 'file_info' in dataset.metadata:
-                    file_name = dataset.metadata['file_info'].get('filename', None)
+                if dataset.metadata and "file_info" in dataset.metadata:
+                    file_name = dataset.metadata["file_info"].get("filename", None)
                 else:
                     # Fallback to a default name
                     file_name = f"{dataset.name.replace(' ', '_')}.parquet"
             else:
                 # Get dataset by file name
-                file_name = validated_data['file_name']
+                file_name = validated_data["file_name"]
 
             # Get the LazyFrame
             lazy_df = get_file_from_s3(file_name)
@@ -468,19 +485,18 @@ class DatasetColumnAggregationsView(APIView):
             num_rows = df_info[0, 0]
             num_columns = len(lazy_df.columns)
 
-            return Response({
-                "dataset_info": {
-                    "file_name": file_name,
-                    "num_columns": num_columns,
-                    "num_rows": num_rows
+            return Response(
+                {
+                    "dataset_info": {"file_name": file_name, "num_columns": num_columns, "num_rows": num_rows},
+                    "columns": result,
                 },
-                "columns": result
-            }, status=status.HTTP_200_OK)
+                status=status.HTTP_200_OK,
+            )
 
         except Exception as e:
             return Response(
                 {"error": f"Failed to get dataset column aggregations: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
 
@@ -490,6 +506,7 @@ class DatasetListView(APIView):
 
     GET: Get a list of all datasets.
     """
+
     permission_classes = [AllowAny]
 
     def get(self, request):
@@ -498,7 +515,7 @@ class DatasetListView(APIView):
         """
         try:
             # Get all datasets, ordered by creation date (newest first)
-            datasets = Dataset.objects.all().order_by('-created_date')
+            datasets = Dataset.objects.all().order_by("-created_date")
 
             # Prepare the response
             response_data = []
@@ -509,7 +526,7 @@ class DatasetListView(APIView):
                     "description": dataset.description,
                     "status": dataset.status,
                     "created_date": dataset.created_date,
-                    "modified_date": dataset.modified_date
+                    "modified_date": dataset.modified_date,
                 }
 
                 # Add basic metadata if available
@@ -524,8 +541,7 @@ class DatasetListView(APIView):
 
         except Exception as e:
             return Response(
-                {"error": f"Failed to get datasets: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                {"error": f"Failed to get datasets: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
 
@@ -536,6 +552,7 @@ class DatasetStatusView(APIView):
     GET: Get the current status and metadata of a dataset.
     DELETE: Delete a dataset.
     """
+
     permission_classes = [AllowAny]
 
     def get(self, request, dataset_id=None):
@@ -553,7 +570,7 @@ class DatasetStatusView(APIView):
                 "description": dataset.description,
                 "status": dataset.status,
                 "created_date": dataset.created_date,
-                "modified_date": dataset.modified_date
+                "modified_date": dataset.modified_date,
             }
 
             # If the dataset has been processed successfully, include metadata
@@ -565,8 +582,7 @@ class DatasetStatusView(APIView):
 
         except Exception as e:
             return Response(
-                {"error": f"Failed to get dataset status: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                {"error": f"Failed to get dataset status: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
     def delete(self, request, dataset_id=None):
@@ -580,15 +596,11 @@ class DatasetStatusView(APIView):
             # Delete the dataset
             dataset.delete()
 
-            return Response(
-                {"message": f"Dataset {dataset_id} deleted successfully"},
-                status=status.HTTP_200_OK
-            )
+            return Response({"message": f"Dataset {dataset_id} deleted successfully"}, status=status.HTTP_200_OK)
 
         except Exception as e:
             return Response(
-                {"error": f"Failed to delete dataset: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                {"error": f"Failed to delete dataset: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
 
@@ -598,6 +610,7 @@ class DatasetVisualizationView(APIView):
 
     POST: Generate a visualization based on the provided configuration.
     """
+
     permission_classes = [AllowAny]
 
     def post(self, request, dataset_id=None):
@@ -612,30 +625,26 @@ class DatasetVisualizationView(APIView):
             if dataset.status != "READ_COMPLETE" or not dataset.metadata:
                 return Response(
                     {"error": "Dataset is not ready for visualization. Status: " + dataset.status},
-                    status=status.HTTP_400_BAD_REQUEST
+                    status=status.HTTP_400_BAD_REQUEST,
                 )
 
             # Get the request data
             request_data = request.data
 
             # Validate required fields
-            if 'x_axis' not in request_data or 'y_axis' not in request_data:
+            if "x_axis" not in request_data or "y_axis" not in request_data:
                 return Response(
-                    {"error": "Missing required fields: x_axis and y_axis"},
-                    status=status.HTTP_400_BAD_REQUEST
+                    {"error": "Missing required fields: x_axis and y_axis"}, status=status.HTTP_400_BAD_REQUEST
                 )
 
             # Check if the dataset has metadata
             if not dataset.metadata:
-                return Response(
-                    {"error": "Dataset metadata not found"},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+                return Response({"error": "Dataset metadata not found"}, status=status.HTTP_400_BAD_REQUEST)
 
             # Get the file name from the metadata
             file_name = None
-            if 'file_info' in dataset.metadata:
-                file_name = dataset.metadata['file_info'].get('filename', None)
+            if "file_info" in dataset.metadata:
+                file_name = dataset.metadata["file_info"].get("filename", None)
 
             if not file_name:
                 # Fallback to a default name
@@ -662,9 +671,9 @@ class DatasetVisualizationView(APIView):
                     raise
 
                 # Extract visualization parameters
-                x_axis = request_data['x_axis']
-                y_axis = request_data['y_axis']
-                chart_type = request_data.get('chart_type', 'bar')
+                x_axis = request_data["x_axis"]
+                y_axis = request_data["y_axis"]
+                chart_type = request_data.get("chart_type", "bar")
 
                 # Validate that the columns exist in the DataFrame
                 print(f"Validating columns: x_axis={x_axis}, y_axis={y_axis}")
@@ -674,7 +683,9 @@ class DatasetVisualizationView(APIView):
                 if isinstance(x_axis, list):
                     for col in x_axis:
                         if col not in df.columns:
-                            raise ValueError(f"X-axis column '{col}' not found in dataset. Available columns: {df.columns}")
+                            raise ValueError(
+                                f"X-axis column '{col}' not found in dataset. Available columns: {df.columns}"
+                            )
                 elif x_axis not in df.columns:
                     raise ValueError(f"X-axis column '{x_axis}' not found in dataset. Available columns: {df.columns}")
 
@@ -682,20 +693,22 @@ class DatasetVisualizationView(APIView):
                 if isinstance(y_axis, list):
                     for col in y_axis:
                         if col not in df.columns:
-                            raise ValueError(f"Y-axis column '{col}' not found in dataset. Available columns: {df.columns}")
+                            raise ValueError(
+                                f"Y-axis column '{col}' not found in dataset. Available columns: {df.columns}"
+                            )
                 elif y_axis not in df.columns:
                     raise ValueError(f"Y-axis column '{y_axis}' not found in dataset. Available columns: {df.columns}")
 
                 # Handle x-axis aggregations
-                x_axis_aggregations = request_data.get('x_axis_aggregations', {})
+                x_axis_aggregations = request_data.get("x_axis_aggregations", {})
 
                 # Handle y-axis aggregations
-                y_axis_aggregations = request_data.get('y_axis_aggregations', {})
+                y_axis_aggregations = request_data.get("y_axis_aggregations", {})
                 print(f"Y-axis aggregations: {y_axis_aggregations}")
 
                 # Handle filter
-                filter_column = request_data.get('filter_column', None)
-                filter_value = request_data.get('filter_value', None)
+                filter_column = request_data.get("filter_column", None)
+                filter_value = request_data.get("filter_value", None)
 
                 # Apply filter if provided
                 if filter_column and filter_value:
@@ -713,7 +726,7 @@ class DatasetVisualizationView(APIView):
                     x_axis=x_axis,
                     y_axis=y_axis,
                     x_axis_aggregations=x_axis_aggregations,
-                    y_axis_aggregations=y_axis_aggregations
+                    y_axis_aggregations=y_axis_aggregations,
                 )
 
                 # Extract the chart data and metadata
@@ -729,28 +742,27 @@ class DatasetVisualizationView(APIView):
                     "total_rows": len(df),
                     "filtered_rows": len(df) if not filter_column else None,
                     "aggregation_info": f"Aggregation performed using centralized function",
-                    "metadata": metadata
+                    "metadata": metadata,
                 }
 
                 # Return the visualization data
-                return Response({
-                    "chart_data": chart_data,
-                    "summary": summary
-                }, status=status.HTTP_200_OK)
+                return Response({"chart_data": chart_data, "summary": summary}, status=status.HTTP_200_OK)
 
             except Exception as e:
                 # If there's an error processing the data, return a mock visualization
                 # This is for demonstration purposes only
-                return Response({
-                    "error": f"Error processing data: {str(e)}",
-                    "chart_data": self._generate_mock_chart_data(request_data),
-                    "is_mock": True
-                }, status=status.HTTP_200_OK)
+                return Response(
+                    {
+                        "error": f"Error processing data: {str(e)}",
+                        # "chart_data": self._generate_mock_chart_data(request_data),
+                        "is_mock": True,
+                    },
+                    status=status.HTTP_200_OK,
+                )
 
         except Exception as e:
             return Response(
-                {"error": f"Failed to generate visualization: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                {"error": f"Failed to generate visualization: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
     def _generate_mock_chart_data(self, request_data):
@@ -760,11 +772,11 @@ class DatasetVisualizationView(APIView):
         import random
 
         # Extract visualization parameters
-        y_axis = request_data['y_axis']
-        chart_type = request_data.get('chart_type', 'bar')
+        y_axis = request_data["y_axis"]
+        chart_type = request_data.get("chart_type", "bar")
 
         # Use chart type to adjust the mock data
-        is_time_chart = chart_type in ['line', 'area']
+        is_time_chart = chart_type in ["line", "area"]
 
         # Generate mock data - use date-like labels if it might be a time series
         if is_time_chart:
@@ -781,7 +793,7 @@ class DatasetVisualizationView(APIView):
             {"bg": "rgba(75, 192, 192, 0.5)", "border": "rgba(75, 192, 192, 1)"},
             {"bg": "rgba(153, 102, 255, 0.5)", "border": "rgba(153, 102, 255, 1)"},
             {"bg": "rgba(255, 159, 64, 0.5)", "border": "rgba(255, 159, 64, 1)"},
-            {"bg": "rgba(201, 203, 207, 0.5)", "border": "rgba(201, 203, 207, 1)"}
+            {"bg": "rgba(201, 203, 207, 0.5)", "border": "rgba(201, 203, 207, 1)"},
         ]
 
         # Check if y_axis is a list or a single value
@@ -789,15 +801,14 @@ class DatasetVisualizationView(APIView):
 
         # Create a dataset for each y-axis variable
         for i, y_var in enumerate(y_axes):
-            datasets.append({
-                "label": y_var,
-                "data": [random.randint(10, 100) for _ in range(len(labels))],
-                "backgroundColor": colors[i % len(colors)]["bg"],
-                "borderColor": colors[i % len(colors)]["border"],
-                "borderWidth": 1
-            })
+            datasets.append(
+                {
+                    "label": y_var,
+                    "data": [random.randint(10, 100) for _ in range(len(labels))],
+                    "backgroundColor": colors[i % len(colors)]["bg"],
+                    "borderColor": colors[i % len(colors)]["border"],
+                    "borderWidth": 1,
+                }
+            )
 
-        return {
-            "labels": labels,
-            "datasets": datasets
-        }
+        return {"labels": labels, "datasets": datasets}
